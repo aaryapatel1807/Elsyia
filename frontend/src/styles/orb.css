@@ -1,0 +1,232 @@
+/* Elysia Orb HUD — layout mechanics adapted from the Ultron UI reference,
+   restyled to Elysia's premium/minimal/glassmorphism design language
+   (see docs/PERSONALITY.md and the UI vision in the project brief). */
+
+.orb-root {
+  position: fixed;
+  inset: 0;
+  cursor: grab;
+}
+
+.orb-root:active {
+  cursor: grabbing;
+}
+
+.orb-root canvas {
+  display: block;
+}
+
+/* Soft film grain — subtle, not a terminal-grunge effect */
+.overlay-grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 150px;
+  mix-blend-mode: screen;
+}
+
+.overlay-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(2, 2, 8, 0.65) 100%);
+}
+
+/* No scanlines — that read as CRT/terminal, not "premium desktop presence" */
+.overlay-scanlines {
+  display: none;
+}
+
+/* ——— HUD ——— */
+.hud {
+  position: fixed;
+  z-index: 20;
+  color: #cdeee7;
+  font-family: "Inter", system-ui, sans-serif;
+  user-select: none;
+}
+
+.hud-controls {
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.hud-btn {
+  min-width: 44px;
+  height: 40px;
+  padding: 0 14px;
+  background: rgba(15, 20, 22, 0.55);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  border-radius: 10px;
+  color: #5eead4;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 20px rgba(94, 234, 212, 0.06) inset;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hud-btn:hover {
+  background: rgba(94, 234, 212, 0.12);
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow: 0 0 18px rgba(94, 234, 212, 0.2);
+}
+
+.hud-btn:active {
+  background: rgba(94, 234, 212, 0.2);
+}
+
+.hud-btn[aria-pressed="true"] {
+  background: rgba(94, 234, 212, 0.18);
+  border-color: #5eead4;
+  color: #eafff9;
+}
+
+.hud-row {
+  display: flex;
+  gap: 8px;
+}
+
+.hud-hint {
+  bottom: 28px;
+  left: 28px;
+  font-size: 11px;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.hud-hint .key {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid rgba(94, 234, 212, 0.3);
+  border-radius: 4px;
+  margin-right: 4px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.hud-title {
+  top: 28px;
+  left: 28px;
+  font-family: "Sora", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.hud-title::after {
+  content: "";
+  display: block;
+  margin-top: 8px;
+  width: 100px;
+  height: 1px;
+  background: linear-gradient(to right, rgba(94, 234, 212, 0.7), transparent);
+}
+
+.hud-error {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #ff8a80;
+}
+
+/* ——— Camera preview panel (gesture input) ——— */
+.camera-panel {
+  position: relative;
+  width: 200px;
+  height: 150px;
+  display: none;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(8, 10, 14, 0.6);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 24px rgba(94, 234, 212, 0.08);
+}
+
+.camera-panel.visible {
+  display: block;
+}
+
+.camera-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  filter: saturate(1.1) brightness(0.85) contrast(1.05);
+  opacity: 0.9;
+}
+
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camera-status {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 10px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* ——— Assistant status ring — placeholder for the voice pipeline (Stage 3) ——— */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  background: rgba(15, 20, 22, 0.5);
+  backdrop-filter: blur(8px);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5eead4;
+  box-shadow: 0 0 8px rgba(94, 234, 212, 0.8);
+}
+
+.status-dot.thinking {
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+}
+
+.status-dot.speaking {
+  background: #f472b6;
+  box-shadow: 0 0 8px rgba(244, 114, 182, 0.8);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}

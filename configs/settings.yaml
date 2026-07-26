@@ -1,0 +1,90 @@
+# Elysia Configuration File
+# This file contains application settings that can be overridden by environment variables
+
+server:
+  host: "127.0.0.1"
+  port: 8000
+  debug: false
+  reload: false
+
+llm:
+  default_provider: "ollama"
+  default_model: "llama3.2"
+  default_temperature: 0.7
+  max_tokens: 2000
+  
+  providers:
+    ollama:
+      base_url: "http://localhost:11434"
+      timeout: 120
+      models:
+        - "llama3.2"
+        - "llama3.1"
+        - "mistral"
+        - "phi3"
+    
+    openrouter:
+      base_url: "https://openrouter.ai/api/v1"
+      timeout: 60
+      models:
+        - "anthropic/claude-3.5-sonnet"
+        - "openai/gpt-4-turbo"
+        - "google/gemini-pro"
+    
+    gemini:
+      timeout: 60
+      models:
+        - "gemini-pro"
+        - "gemini-1.5-flash"
+
+stt:
+  default_provider: "whisper"
+  
+  whisper:
+    model: "base"  # tiny, base, small, medium, large
+    device: "cpu"  # cpu or cuda
+    compute_type: "int8"
+    language: "en"
+
+tts:
+  default_provider: "piper"
+  
+  piper:
+    voice: "en_US-lessac-medium"
+    speed: 1.0
+    quality: "medium"
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 1024
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: "logs/elysia.log"
+  format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+security:
+  cors_origins:
+    - "http://localhost:5173"  # Vite dev server
+    - "http://localhost:3000"  # React dev server
+  max_request_size: 10485760  # 10MB
+  rate_limit_per_minute: 60
+
+performance:
+  max_concurrent_requests: 10
+  request_timeout: 30
+  connection_pool_size: 10
+
+# Feature flags for future phases
+features:
+  memory: false        # Phase 2
+  vision: false        # Phase 3
+  plugins: false       # Phase 4
+  desktop_control: false  # Phase 5
+  browser_control: false  # Phase 6
+  code_assistant: false   # Phase 7
+  planning: false         # Phase 8
+  autonomous_agents: false  # Phase 9
