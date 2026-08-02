@@ -13,15 +13,15 @@ from app.services.llm.ollama import OllamaProvider
 
 logger = get_logger("llm.factory")
 
-# Cached provider instance (singleton per process)
-_llm_provider: LLMProvider | None = None
+# Cached provider instances (singletons per provider)
+_llm_providers: dict[str, LLMProvider] = {}
 
 
 def get_llm_provider(
     provider: Literal["ollama", "openrouter", "gemini"] = "ollama"
 ) -> LLMProvider:
     """
-    Get or create the LLM provider instance (cached).
+    Get or create the LLM provider instance (cached per provider).
 
     Args:
         provider: Provider name ("ollama", "openrouter", or "gemini")
@@ -32,14 +32,14 @@ def get_llm_provider(
     Raises:
         ConfigurationError: If provider is unknown or misconfigured
     """
-    global _llm_provider
-    if _llm_provider is None:
+    global _llm_providers
+    
+    if provider not in _llm_providers:
         settings = get_settings()
-
         logger.info(f"Creating LLM provider: {provider}")
 
         if provider == "ollama":
-            _llm_provider = OllamaProvider(
+            _llm_providers[provider] = OllamaProvider(
                 base_url=settings.OLLAMA_BASE_URL,
                 model=settings.DEFAULT_LLM_MODEL
             )
@@ -63,7 +63,8 @@ def get_llm_provider(
                 f"Unknown LLM provider: {provider}",
                 details={"provider": provider, "available": ["ollama"]}
             )
-    return _llm_provider
+    
+    return _llm_providers[provider]
 
 
 # Deprecated alias for backward compatibility

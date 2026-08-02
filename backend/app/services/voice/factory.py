@@ -14,9 +14,9 @@ from app.services.voice.whisper_stt import WhisperSTTProvider
 
 logger = get_logger("voice.factory")
 
-# Cached provider instances (singletons per process)
-_stt_provider: STTProvider | None = None
-_tts_provider: TTSProvider | None = None
+# Cached provider instances (singletons per provider type)
+_stt_providers: dict[str, STTProvider] = {}
+_tts_providers: dict[str, TTSProvider] = {}
 
 
 def get_stt_provider(provider: Literal["whisper"] = "whisper") -> STTProvider:
@@ -29,19 +29,21 @@ def get_stt_provider(provider: Literal["whisper"] = "whisper") -> STTProvider:
     Returns:
         Configured STT provider instance.
     """
-    global _stt_provider
-    if _stt_provider is None:
+    global _stt_providers
+    
+    if provider not in _stt_providers:
         settings = get_settings()
         logger.info(f"Creating STT provider: {provider}")
         if provider == "whisper":
-            _stt_provider = WhisperSTTProvider(
+            _stt_providers[provider] = WhisperSTTProvider(
                 model_size=settings.WHISPER_MODEL,
                 device=settings.WHISPER_DEVICE,
                 compute_type=settings.WHISPER_COMPUTE_TYPE,
             )
         else:
             raise ConfigurationError(f"Unknown STT provider: {provider}", details={"provider": provider})
-    return _stt_provider
+    
+    return _stt_providers[provider]
 
 
 def get_tts_provider(provider: Literal["piper"] = "piper") -> TTSProvider:
@@ -54,19 +56,21 @@ def get_tts_provider(provider: Literal["piper"] = "piper") -> TTSProvider:
     Returns:
         Configured TTS provider instance.
     """
-    global _tts_provider
-    if _tts_provider is None:
+    global _tts_providers
+    
+    if provider not in _tts_providers:
         settings = get_settings()
         logger.info(f"Creating TTS provider: {provider}")
         if provider == "piper":
-            _tts_provider = PiperTTSProvider(
+            _tts_providers[provider] = PiperTTSProvider(
                 voice=settings.PIPER_VOICE,
                 models_dir=settings.PIPER_MODELS_DIR,
                 speed=settings.PIPER_SPEED,
             )
         else:
             raise ConfigurationError(f"Unknown TTS provider: {provider}", details={"provider": provider})
-    return _tts_provider
+    
+    return _tts_providers[provider]
 
 
 # Deprecated aliases for backward compatibility

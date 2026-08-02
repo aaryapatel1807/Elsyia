@@ -22,7 +22,8 @@ router = APIRouter()
 
 
 # Load system prompt
-SYSTEM_PROMPT_PATH = Path(__file__).parent.parent.parent.parent.parent / "prompts" / "elysia.txt"
+# Path from backend/app/api/v1/chat.py to repo_root/prompts/elysia.txt
+SYSTEM_PROMPT_PATH = Path(__file__).parent.parent.parent.parent / "prompts" / "elysia.txt"
 try:
     with open(SYSTEM_PROMPT_PATH, "r", encoding="utf-8") as f:
         SYSTEM_PROMPT = f.read()
