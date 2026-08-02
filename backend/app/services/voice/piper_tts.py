@@ -79,7 +79,10 @@ class PiperTTSProvider(TTSProvider):
         yield wav_bytes
 
     def _synthesize_sync(self, voice, text: str) -> bytes:
+        from piper import SynthesisConfig
+
+        syn_config = SynthesisConfig(length_scale=1.0 / self._speed)
         buffer = io.BytesIO()
         with wave.open(buffer, "wb") as wav_file:
-            voice.synthesize(text, wav_file, length_scale=1.0 / self._speed)
+            voice.synthesize_wav(text, wav_file, syn_config=syn_config)
         return buffer.getvalue()

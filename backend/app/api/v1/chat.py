@@ -61,9 +61,10 @@ async def chat(request: ChatRequest):
     # Add user message
     conversation_manager.add_message(conv_id, MessageRole.USER, request.message)
     
-    # Format prompt with conversation history
-    context = conversation_manager.format_for_llm(conv_id, SYSTEM_PROMPT)
-    prompt = f"{context}Assistant: "
+    # Construct messages list for LLM
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for msg in conversation.messages:
+        messages.append({"role": msg.role.value, "content": msg.content})
     
     if request.stream:
         # Streaming response using Server-Sent Events
@@ -71,7 +72,7 @@ async def chat(request: ChatRequest):
             try:
                 full_response = ""
                 async for token in llm.generate(
-                    prompt, 
+                    messages, 
                     temperature=request.temperature or 0.7
                 ):
                     full_response += token
@@ -101,7 +102,7 @@ async def chat(request: ChatRequest):
         try:
             full_response = ""
             async for token in llm.generate(
-                prompt,
+                messages,
                 temperature=request.temperature or 0.7
             ):
                 full_response += token

@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     
     # Whisper settings
     WHISPER_MODEL: Literal["tiny", "base", "small", "medium", "large"] = Field(
-        default="base",
+        default="tiny",
         description="Whisper model size"
     )
     WHISPER_DEVICE: Literal["cpu", "cuda"] = Field(

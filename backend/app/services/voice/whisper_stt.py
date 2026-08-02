@@ -77,11 +77,19 @@ class WhisperSTTProvider(STTProvider):
 
     def _transcribe_sync(self, model, audio_bytes: bytes, language: Optional[str]) -> str:
         logger.info(f"Whisper input: {len(audio_bytes)} bytes audio data")
+        
+        # Force English if no language is specified to prevent noise from 
+        # being hallucinated as Welsh, Urdu, etc.
+        if not language:
+            language = "en"
+            
         segments, info = model.transcribe(
             io.BytesIO(audio_bytes),
             language=language,
             vad_filter=True,
+            condition_on_previous_text=False,
         )
+        
         text = " ".join(segment.text.strip() for segment in segments).strip()
         logger.info(f"Whisper output: '{text}' (length={len(text)}), duration={info.duration:.2f}s, language={info.language}")
         return text

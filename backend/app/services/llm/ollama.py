@@ -28,13 +28,12 @@ class OllamaProvider(LLMProvider):
         """
         self.base_url = base_url.rstrip("/")
         self.model = model
-        self.client = httpx.AsyncClient(timeout=120.0)  # Longer timeout for LLMs
+        self.client = httpx.AsyncClient(timeout=300.0)  # 5-minute timeout for slow local cold starts
         logger.info(f"Ollama provider initialized: {base_url} (model: {model})")
     
     async def generate(
         self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
+        messages: list[dict],
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> AsyncGenerator[str, None]:
@@ -42,8 +41,7 @@ class OllamaProvider(LLMProvider):
         Generate response from Ollama.
         
         Args:
-            prompt: User prompt with context
-            system_prompt: System instructions
+            messages: List of conversation messages
             temperature: Generation temperature
             max_tokens: Max tokens (not used by Ollama)
             
@@ -54,18 +52,19 @@ class OllamaProvider(LLMProvider):
             LLMError: If Ollama request fails
         """
         try:
-            url = f"{self.base_url}/api/generate"
+            url = f"{self.base_url}/api/chat"
             payload = {
                 "model": self.model,
-                "prompt": prompt,
+                "messages": messages,
                 "stream": True,
+                "keep_alive": "30m",
                 "options": {
                     "temperature": temperature,
+                    "num_predict": 300,   # cap at ~200 words for fast, sharp answers
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1,
                 }
             }
-            
-            if system_prompt:
-                payload["system"] = system_prompt
             
             logger.debug(f"Sending request to Ollama: {url}")
             
@@ -83,8 +82,8 @@ class OllamaProvider(LLMProvider):
                     if line.strip():
                         try:
                             data = json.loads(line)
-                            if "response" in data and data["response"]:
-                                yield data["response"]
+                            if "message" in data and "content" in data["message"]:
+                                yield data["message"]["content"]
                             
                             # Check if done
                             if data.get("done", False):

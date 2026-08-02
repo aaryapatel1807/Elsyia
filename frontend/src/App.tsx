@@ -9,7 +9,7 @@ import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
  * UI; revisit if a text input is ever added alongside voice).
  */
 export default function App() {
-  const { status, lastError, startListening, stopListeningAndRespond, isRecording } = useVoiceAssistant();
+  const { status, lastError, startListening, stopListeningAndRespond, forceResetToIdle, isRecording } = useVoiceAssistant();
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -22,7 +22,7 @@ export default function App() {
       if (e.code === "Escape") {
         e.preventDefault();
         if (status !== "idle") {
-          void stopListeningAndRespond();
+          void forceResetToIdle();
         }
       }
     };
