@@ -39,6 +39,7 @@ def get_stt_provider(provider: Literal["whisper"] = "whisper") -> STTProvider:
                 model_size=settings.WHISPER_MODEL,
                 device=settings.WHISPER_DEVICE,
                 compute_type=settings.WHISPER_COMPUTE_TYPE,
+                beam_size=settings.WHISPER_BEAM_SIZE,
             )
         else:
             raise ConfigurationError(f"Unknown STT provider: {provider}", details={"provider": provider})

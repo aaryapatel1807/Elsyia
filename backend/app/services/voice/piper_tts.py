@@ -61,6 +61,10 @@ class PiperTTSProvider(TTSProvider):
                 self._voice = PiperVoice.load(str(model_path), config_path=str(config_path))
         return self._voice
 
+    async def warmup(self) -> None:
+        """Load the Piper voice model without synthesizing user text."""
+        await self._load_voice()
+
     async def synthesize(self, text: str) -> AsyncGenerator[bytes, None]:
         """Synthesize text to a single WAV byte payload."""
         if not text.strip():

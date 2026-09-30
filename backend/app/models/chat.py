@@ -55,7 +55,11 @@ class ChatRequest(BaseModel):
         le=2.0,
         description="LLM temperature"
     )
-    
+    confirm_tool: bool = Field(
+        default=False,
+        description="Confirm a routed tool action when it requires approval"
+    )
+
     class Config:
         """Pydantic configuration."""
         json_schema_extra = {
@@ -74,7 +78,8 @@ class ChatResponse(BaseModel):
     conversation_id: UUID = Field(..., description="Conversation ID")
     tokens_used: Optional[int] = Field(default=None, description="Tokens used")
     model: str = Field(..., description="Model used")
-    
+    tool_result: Optional[dict] = Field(default=None, description="Structured tool result")
+
     class Config:
         """Pydantic configuration."""
         json_schema_extra = {
@@ -90,11 +95,13 @@ class ChatResponse(BaseModel):
 class StreamChunk(BaseModel):
     """Streaming response chunk."""
     
-    type: Literal["token", "done", "error"] = Field(..., description="Chunk type")
+    type: Literal["token", "tool", "done", "error"] = Field(..., description="Chunk type")
+
     content: Optional[str] = Field(default=None, description="Content (for token type)")
     conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID (for done type)")
     error: Optional[str] = Field(default=None, description="Error message (for error type)")
-    
+    tool_result: Optional[dict] = Field(default=None, description="Structured tool result")
+
     class Config:
         """Pydantic configuration."""
         json_schema_extra = {

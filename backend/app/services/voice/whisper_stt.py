@@ -26,10 +26,11 @@ class WhisperSTTProvider(STTProvider):
     of push-to-talk audio is fast.
     """
 
-    def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8") -> None:
+    def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8", beam_size: int = 1) -> None:
         self._model_size = model_size
         self._device = device
         self._compute_type = compute_type
+        self._beam_size = beam_size
         self._model = None  # lazy-loaded on first use
         self._load_lock = asyncio.Lock()
 
@@ -54,6 +55,10 @@ class WhisperSTTProvider(STTProvider):
                     compute_type=self._compute_type,
                 )
         return self._model
+
+    async def warmup(self) -> None:
+        """Load the Whisper model without transcribing user audio."""
+        await self._load_model()
 
     async def transcribe(self, audio_bytes: bytes, language: Optional[str] = None) -> str:
         """
@@ -88,6 +93,7 @@ class WhisperSTTProvider(STTProvider):
             language=language,
             vad_filter=True,
             condition_on_previous_text=False,
+            beam_size=self._beam_size,
         )
         
         text = " ".join(segment.text.strip() for segment in segments).strip()

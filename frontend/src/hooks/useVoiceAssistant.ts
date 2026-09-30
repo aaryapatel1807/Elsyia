@@ -10,6 +10,15 @@ interface ChatApiResponse {
   conversation_id: string;
 }
 
+interface ToolResult {
+  status: string;
+  tool_name: string;
+  result?: unknown;
+  error?: string | null;
+  confirmation_required?: boolean;
+  confirmation_message?: string | null;
+}
+
 /**
  * Connects push-to-talk audio capture to the backend chat + voice
  * endpoints, and exposes the assistant's current state so the orb can
@@ -22,6 +31,7 @@ export function useVoiceAssistant() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [reply, setReply] = useState<string>("");
+  const [toolResult, setToolResult] = useState<ToolResult | null>(null);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const conversationIdRef = useRef<string | undefined>(undefined);
@@ -67,6 +77,7 @@ export function useVoiceAssistant() {
 
       setStatus("speaking");
       setReply("");
+      setToolResult(null);
 
       const reader = chatResponse.body?.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -96,6 +107,7 @@ export function useVoiceAssistant() {
                 const data = JSON.parse(dataStr);
                 if (data.type === 'token') {
                   fullReply += data.content;
+                  setToolResult(null);
                   currentSentence += data.content;
                   setReply(fullReply);
                   
@@ -108,6 +120,15 @@ export function useVoiceAssistant() {
                         audioQueue.enqueue(url);
                       }).catch(err => console.error("Failed to fetch audio for chunk:", err));
                     }
+                  }
+                } else if (data.type === 'tool') {
+                  const toolReply = data.content || "";
+                  setReply(toolReply);
+                  setToolResult(data.tool_result || null);
+                  if (toolReply.trim()) {
+                    fetchSpeechUrl(toolReply).then(url => {
+                      audioQueue.enqueue(url);
+                    }).catch(err => console.error("Failed to fetch tool result audio:", err));
                   }
                 } else if (data.type === 'done') {
                   conversationIdRef.current = data.conversation_id;
@@ -177,5 +198,5 @@ export function useVoiceAssistant() {
     }
   }, [status, stopListeningAndRespond]);
 
-  return { status, transcript, reply, lastError, startListening, stopListeningAndRespond, forceResetToIdle, isRecording };
+  return { status, transcript, reply, toolResult, lastError, startListening, stopListeningAndRespond, forceResetToIdle, isRecording };
 }
