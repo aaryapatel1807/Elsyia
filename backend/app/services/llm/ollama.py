@@ -40,7 +40,12 @@ class OllamaProvider(LLMProvider):
         self.num_ctx = num_ctx
         self.num_predict = num_predict
         # A bounded timeout prevents a stalled local runtime from blocking the UI indefinitely.
-        self.client = httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=2.0))
+        # trust_env=False: this client only ever talks to localhost, so proxy
+        # environment variables must never interfere (a malformed proxy/no_proxy
+        # entry would otherwise break client construction entirely).
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(20.0, connect=2.0), trust_env=False
+        )
 
         logger.info(f"Ollama provider initialized: {base_url} (model: {model})")
     

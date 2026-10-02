@@ -49,6 +49,31 @@ from app.services.tools.draft_tools import DraftTextTool
 from app.services.tools.reminders import CancelReminderTool, CreateReminderTool, ListRemindersTool
 from app.services.tools.registry import ToolExecutionResult, ToolRegistry, registry
 from app.services.tools.system_tools import GetCurrentTimeTool, GetSystemInfoTool
+# Jev integrations: media/messaging/social, Gmail + Calendar (OAuth),
+# timers and notes. Imported after the registry so the jev package
+# (which references the registry submodule) cannot partially initialise.
+from app.services.jev.calendar import (
+    CalendarTodayTool,
+    ConnectCalendarTool,
+    CreateCalendarEventTool,
+)
+from app.services.jev.gmail import (
+    CheckGmailTool,
+    ConnectGmailTool,
+    ReadGmailTool,
+    SearchGmailTool,
+    SendGmailTool,
+)
+from app.services.tools.integrations import (
+    MediaControlTool,
+    MessageWhatsAppTool,
+    OpenLinkedInTool,
+    OpenSpotifyTool,
+    PlayYouTubeTool,
+    ReadNotesTool,
+    SetTimerTool,
+    TakeNoteTool,
+)
 from app.services.tools.vision_tools import CaptureScreenTool, OcrImageTool
 from app.services.tools.web_tools import (
     FetchUrlTool,
@@ -107,6 +132,23 @@ AVAILABLE_TOOLS: list[Tool] = [
     CodeRepositoryStatusTool(),
     CaptureScreenTool(),
     OcrImageTool(),
+    # --- Jev integrations ---
+    PlayYouTubeTool(),
+    MediaControlTool(),
+    MessageWhatsAppTool(),
+    OpenLinkedInTool(),
+    OpenSpotifyTool(),
+    CheckGmailTool(),
+    SearchGmailTool(),
+    ReadGmailTool(),
+    SendGmailTool(),
+    ConnectGmailTool(),
+    CalendarTodayTool(),
+    CreateCalendarEventTool(),
+    ConnectCalendarTool(),
+    SetTimerTool(),
+    TakeNoteTool(),
+    ReadNotesTool(),
 ]
 
 for _tool in AVAILABLE_TOOLS:
@@ -135,6 +177,9 @@ for _tool in AVAILABLE_TOOLS:
                 "download_browser_file",
                 "capture_screen",
                 "ocr_image",
+                # --- Jev: acting on the outside world needs Aarya's say-so ---
+                "send_gmail",
+                "create_calendar_event",
             },
         )
 

@@ -6,13 +6,14 @@ Combines all v1 endpoints into a single router.
 
 from fastapi import APIRouter
 
-from app.api.v1 import admin, agents, browser, chat, collaboration, code, identity, input as input_router, memory, plans, plugins, status, sync, tools, voice
+from app.api.v1 import admin, agents, browser, chat, collaboration, code, identity, input as input_router, jev, memory, plans, plugins, status, sync, tools, voice
 
 # Create main API router
 api_router = APIRouter()
 
 # Include sub-routers
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+api_router.include_router(jev.router, prefix="/jev", tags=["jev"])
 api_router.include_router(status.router, prefix="/status", tags=["status"])
 api_router.include_router(voice.router, prefix="/voice", tags=["voice"])
 api_router.include_router(memory.router, prefix="/memory", tags=["memory"])

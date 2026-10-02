@@ -28,6 +28,10 @@ dependencies = [
     "piper-tts>=1.2.0",
     # Ollama client
     "ollama>=0.1.0",
+    # Google APIs: Gmail, Calendar, YouTube Data (Jev integrations)
+    "google-api-python-client>=2.100.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-auth-httplib2>=0.2.0",
 ]
 
 [project.optional-dependencies]

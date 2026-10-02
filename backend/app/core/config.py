@@ -713,6 +713,28 @@ class Settings(BaseSettings):
         description="Semicolon-separated SHA-256 fingerprints of trusted Ed25519 plugin signing keys",
     )
 
+    # === Jev ===
+    JEV_DATA_DIR: str = Field(
+        default="~/.jev",
+        description="Directory for Jev-owned user data (contacts, notes, OAuth tokens)",
+    )
+    YOUTUBE_API_KEY: str = Field(
+        default="",
+        description="Optional free YouTube Data API key — resolves 'play X on YouTube' to the exact video",
+    )
+    JEV_GOOGLE_CLIENT_JSON: str = Field(
+        default="",
+        description="Path to the OAuth client JSON (Desktop app) for Gmail/Calendar",
+    )
+    JEV_GOOGLE_CLIENT_ID: str = Field(
+        default="",
+        description="Google OAuth client ID (alternative to JEV_GOOGLE_CLIENT_JSON)",
+    )
+    JEV_GOOGLE_CLIENT_SECRET: str = Field(
+        default="",
+        description="Google OAuth client secret (alternative to JEV_GOOGLE_CLIENT_JSON)",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
