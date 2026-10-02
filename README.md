@@ -6,7 +6,6 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Phase](https://img.shields.io/badge/phase-1-orange)
 
----
 
 ## 🎯 Vision
 
@@ -26,6 +25,120 @@ This is **Phase 1** — the foundation. A beautiful, voice-enabled desktop assis
 - ✅ **Beautiful Desktop UI** — Modern, minimal, and elegant
 - ✅ **Multi-Provider LLM Support** — Ollama, OpenRouter, Gemini
 - ✅ **FastAPI Backend** — Professional REST API architecture
+
+---
+
+## 🎩 Jev — the assistant at the heart of Elysia
+
+**Jev** (like "Jeeves") is Elysia's named AI butler: a real, working voice
+assistant, not a demo. Press **Ctrl+Shift+J** anywhere and Jev appears —
+hold to talk, release, and he thinks and speaks back.
+
+### The voice loop
+
+```
+hotkey → mic capture → Whisper STT → intent routing → Ollama reasoning
+       → action execution → Piper TTS spoken reply
+```
+
+Engineered for latency: faster-whisper `tiny` (int8, beam size 1), a snappy
+local Ollama model with a small context window, deterministic intent routing
+that skips the LLM entirely for commands, and sentence-chunked TTS so the
+first sentence starts speaking as soon as it is ready. Every turn reports
+per-stage timings (`/jev/status`, `timings_ms` on every response).
+
+### Run it
+
+```bash
+# 1. Backend
+cd backend
+python -m venv .venv && ./.venv/bin/pip install -e ".[dev]"
+cp ../.env.example .env   # edit as needed
+./.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# 2. Ollama (separate terminal) — any snappy local model works
+ollama pull qwen2.5:1.5b
+ollama serve
+
+# 3. Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev            # web UI at http://localhost:5173
+npm run electron       # full desktop app with the Ctrl+Shift+J hotkey
+```
+
+Health check: `GET http://127.0.0.1:8000/api/v1/jev/status` reports STT,
+LLM, TTS, Gmail and Calendar state in one call.
+
+### What Jev can do
+
+| Say | Jev does |
+|---|---|
+| "play lo-fi beats on YouTube" | Opens the exact video (with free Data API key) or YouTube search |
+| "pause" / "next song" | System media keys (Windows) |
+| "message mom on WhatsApp saying I'll be late" | Opens the chat with text prefilled, ready to send |
+| "open LinkedIn jobs" / "search LinkedIn for internships" | Opens the right LinkedIn page |
+| "play jazz on Spotify" | Opens Spotify search; media keys control playback |
+| "check my email" / "search my emails for invoice" | Gmail via the official API |
+| "send email to a@b.com subject hi saying hello" | Sends via Gmail (asks first) |
+| "what's on my calendar" / "schedule dentist at …" | Google Calendar via the official API |
+| "set a timer for 10 minutes called pasta" | Local persistent timer |
+| "take a note buy milk" / "read my notes" | Timestamped notes at `~/.jev/notes.md` |
+| "what time is it" / "open calculator" / "remind me …" | The full existing Elysia tool suite |
+
+Destructive or outward-facing actions (sending email, creating calendar
+events, deleting files, pressing keys) keep a confirmation step — Jev has
+full permission to act, and asks once before doing anything irreversible.
+
+### Honest limits
+
+- **WhatsApp:** there is no free official API for personal WhatsApp
+  messaging or reading chats. Jev uses `wa.me` deep links — the chat opens
+  with your text prefilled and you press send. No scrapers, no unofficial
+  automation, nothing against WhatsApp's terms.
+- **LinkedIn:** posting via API requires a LinkedIn partnership, which is
+  not available. Jev opens feeds, jobs, search and profiles; it does not
+  fake posting.
+- **Spotify:** full Web API playback control needs per-user OAuth and
+  Spotify Premium. Jev opens Spotify and drives playback with media keys;
+  the Web API path is documented as a future step, not faked.
+- **YouTube:** without a `YOUTUBE_API_KEY`, "play X" opens search results
+  rather than the exact video. The key is free with 10,000 quota units/day.
+- **Media keys** (pause/next/previous) work on Windows with
+  `DESKTOP_INPUT_ENABLED=true`.
+- **Gmail/Calendar** need a one-time OAuth setup (below). Until then Jev
+  tells you exactly how to connect instead of failing silently.
+
+### Connect Gmail / Calendar (one-time, about 5 minutes)
+
+Jev uses Google's official OAuth2 desktop-app flow. **You create the OAuth
+client yourself — nothing is created in your Google account by this repo.**
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create
+   a project (any name, e.g. "Jev").
+2. **APIs & Services → Library:** enable **Gmail API** and
+   **Google Calendar API**.
+3. **APIs & Services → OAuth consent screen:** choose **External**, fill in
+   the app name and your email, add yourself as a test user, and add the
+   scopes `.../auth/gmail.readonly`, `.../auth/gmail.send`,
+   `.../auth/calendar`.
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
+   → application type **Desktop app** → download the JSON.
+5. Set `JEV_GOOGLE_CLIENT_JSON=/path/to/your/client_secret.json` in `.env`
+   (or `JEV_GOOGLE_CLIENT_ID` / `JEV_GOOGLE_CLIENT_SECRET`).
+6. Say **"Jev, connect Gmail"** — your browser opens Google's consent page;
+   approve, and the token is stored locally at `~/.jev/`. Same for
+   **"Jev, connect calendar"**.
+
+Jev never touches your live mailbox during development — the test suite
+mocks the Gmail API.
+
+### Jev's local data
+
+Everything Jev owns lives in `~/.jev/` (override with `JEV_DATA_DIR`):
+`contacts.json` (WhatsApp name → number map),
+`notes.md`, and per-service Google OAuth tokens. Plain files, human-readable,
+yours to edit.
 
 ---
 
@@ -127,35 +240,57 @@ Elysia's UI draws inspiration from:
 
 ## 🛠 Installation
 
-> **Note:** Phase 1 is under active development.
+> **Note:** Elysia is under active development. Jev (the voice assistant)
+> is the working centrepiece — see the Jev section above.
 
 ### Prerequisites
 - **Node.js** 18+
 - **Python** 3.11+
-- **uv** (Python package manager)
+- **Ollama** installed locally ([ollama.com](https://ollama.com)) with a
+  snappy model pulled, e.g. `ollama pull qwen2.5:1.5b`
+- No paid APIs, no cloud keys — everything runs local-first and free.
 
 ### Quick Start
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/elysia.git
-cd elysia
+git clone https://github.com/aaryapatel1807/Elsyia.git
+cd Elsyia
 
 # Backend setup
 cd backend
-uv sync
-cp .env.example .env
-# Edit .env with your API keys
+python -m venv .venv
+./.venv/bin/pip install -e ".[dev]"
+cp ../.env.example .env   # optional: tune providers and keys
 
-# Start backend
-uv run python main.py
+# Start the backend (leave running)
+./.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 # Frontend setup (separate terminal)
 cd frontend
 npm install
+npm run dev               # web UI at http://localhost:5173
 
-# Start frontend
-npm run dev
+# Desktop app with the Ctrl+Shift+J global hotkey (separate terminal)
+npm run electron:dev
+```
+
+### Verify the loop
+
+```bash
+# Backend health
+curl http://127.0.0.1:8000/health
+
+# Jev loop health: STT, LLM, TTS, Gmail/Calendar state
+curl http://127.0.0.1:8000/api/v1/jev/status
+
+# One text turn through Jev (no audio needed)
+curl -X POST http://127.0.0.1:8000/api/v1/jev/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"what time is it"}'
+
+# Run the test suite
+cd backend && ./.venv/bin/python -m pytest tests/ -q
 ```
 
 ---
