@@ -11,8 +11,16 @@ import SyncPanel from "@/components/SyncPanel";
 import AdminPanel from "@/components/AdminPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import JevOverlay from "@/components/JevOverlay";
+
+const isJevOverlay =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("overlay") === "jev";
 
 export default function App() {
+  if (isJevOverlay) {
+    return <JevOverlay />;
+  }
   const { status, toolResult, lastError, startListening, stopListeningAndRespond, forceResetToIdle, isRecording } = useVoiceAssistant();
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [pluginsOpen, setPluginsOpen] = useState(false);
