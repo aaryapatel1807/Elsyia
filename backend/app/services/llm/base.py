@@ -19,8 +19,7 @@ class LLMProvider(ABC):
     @abstractmethod
     async def generate(
         self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
+        messages: list[dict],
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> AsyncGenerator[str, None]:
@@ -28,8 +27,7 @@ class LLMProvider(ABC):
         Generate response from LLM.
         
         Args:
-            prompt: User prompt (may include conversation history)
-            system_prompt: System prompt defining behavior
+            messages: List of message dictionaries containing 'role' and 'content'
             temperature: Generation temperature (0.0-2.0)
             max_tokens: Maximum tokens to generate
             

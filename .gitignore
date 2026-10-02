@@ -11,14 +11,14 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+backend/build/
 develop-eggs/
-dist/
+backend/dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+backend/lib/
+backend/lib64/
 parts/
 sdist/
 var/
@@ -27,9 +27,9 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-venv/
-env/
-ENV/
+backend/venv/
+backend/env/
+backend/ENV/
 .venv
 
 # Testing
@@ -55,7 +55,7 @@ dmypy.json
 .DS_Store
 
 # Logs
-logs/
+backend/logs/
 *.log
 
 # Node.js / Frontend

@@ -22,6 +22,7 @@ from typing import Any
 
 import httpx
 
+from app.core import get_settings
 from app.services.tools.base import Tool, ToolError
 
 _WORLD_NEWS_FEEDS = [
@@ -43,7 +44,12 @@ _FINANCE_NEWS_FEEDS = [
 async def _fetch_and_parse_feed(client: httpx.AsyncClient, url: str) -> list[dict[str, str]]:
     """Fetch a single RSS feed and parse its top items. Fails soft (empty list)."""
     try:
-        response = await client.get(url, headers={"User-Agent": "Elysia/0.1"}, timeout=5.0)
+        response = await client.get(
+            url,
+            headers={"User-Agent": "Elysia/0.1"},
+            timeout=get_settings().REALTIME_DATA_TIMEOUT_SECONDS,
+            follow_redirects=False,
+        )
         if response.status_code != 200:
             return []
 
@@ -74,9 +80,11 @@ async def _fetch_and_parse_feed(client: httpx.AsyncClient, url: str) -> list[dic
 async def _aggregate_feeds(feeds: list[str]) -> list[dict[str, str]]:
     import asyncio
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
+    if not get_settings().REALTIME_DATA_ENABLED:
+        raise ToolError("Real-time data is disabled. Set REALTIME_DATA_ENABLED=true to enable the allowlisted feeds.")
+    async with httpx.AsyncClient(follow_redirects=False, timeout=get_settings().REALTIME_DATA_TIMEOUT_SECONDS) as client:
         results = await asyncio.gather(*(_fetch_and_parse_feed(client, url) for url in feeds))
-    return [item for sublist in results for item in sublist]
+    return [item for sublist in results for item in sublist][: get_settings().REALTIME_DATA_MAX_ITEMS]
 
 
 class GetWorldNewsTool(Tool):

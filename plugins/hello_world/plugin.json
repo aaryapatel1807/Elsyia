@@ -1,0 +1,11 @@
+{
+  "id": "hello_world",
+  "name": "Hello World",
+  "version": "1.0.0",
+  "description": "A minimal local example plugin for validating the Phase 4 SDK.",
+  "entrypoint": "plugin.py:create_plugin",
+  "tools": ["hello_world"],
+  "permissions": [],
+  "enabled_by_default": true,
+  "trusted": true
+}

@@ -18,7 +18,15 @@ logger = get_logger("llm.ollama")
 class OllamaProvider(LLMProvider):
     """Ollama provider implementation for local LLM inference."""
     
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2"):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:11434",
+        model: str = "llama3.2",
+        keep_alive: str = "30m",
+        num_ctx: int = 2048,
+        num_predict: int = 128,
+    ):
+
         """
         Initialize Ollama provider.
         
@@ -28,13 +36,17 @@ class OllamaProvider(LLMProvider):
         """
         self.base_url = base_url.rstrip("/")
         self.model = model
-        self.client = httpx.AsyncClient(timeout=120.0)  # Longer timeout for LLMs
+        self.keep_alive = keep_alive
+        self.num_ctx = num_ctx
+        self.num_predict = num_predict
+        # A bounded timeout prevents a stalled local runtime from blocking the UI indefinitely.
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=2.0))
+
         logger.info(f"Ollama provider initialized: {base_url} (model: {model})")
     
     async def generate(
         self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
+        messages: list[dict],
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
     ) -> AsyncGenerator[str, None]:
@@ -42,8 +54,7 @@ class OllamaProvider(LLMProvider):
         Generate response from Ollama.
         
         Args:
-            prompt: User prompt with context
-            system_prompt: System instructions
+            messages: List of conversation messages
             temperature: Generation temperature
             max_tokens: Max tokens (not used by Ollama)
             
@@ -54,19 +65,21 @@ class OllamaProvider(LLMProvider):
             LLMError: If Ollama request fails
         """
         try:
-            url = f"{self.base_url}/api/generate"
+            url = f"{self.base_url}/api/chat"
             payload = {
                 "model": self.model,
-                "prompt": prompt,
+                "messages": messages,
                 "stream": True,
+                "keep_alive": self.keep_alive,
                 "options": {
                     "temperature": temperature,
-                }
+                    "num_predict": min(max_tokens, self.num_predict) if max_tokens else self.num_predict,
+                    "num_ctx": self.num_ctx,
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1,
+                },
             }
-            
-            if system_prompt:
-                payload["system"] = system_prompt
-            
+
             logger.debug(f"Sending request to Ollama: {url}")
             
             async with self.client.stream("POST", url, json=payload) as response:
@@ -83,8 +96,8 @@ class OllamaProvider(LLMProvider):
                     if line.strip():
                         try:
                             data = json.loads(line)
-                            if "response" in data and data["response"]:
-                                yield data["response"]
+                            if "message" in data and "content" in data["message"]:
+                                yield data["message"]["content"]
                             
                             # Check if done
                             if data.get("done", False):

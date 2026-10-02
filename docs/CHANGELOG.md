@@ -34,6 +34,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Piper voice missing files (2026-07-31)**
+  - **Root cause**: Piper voice `.onnx` and `.onnx.json` models were missing from `backend/models/piper/`, causing TTS to fail with TTSError.
+  - **Fix**: Downloaded the `en_US-lessac-medium.onnx` model and its JSON config file to the designated directory.
+
+- **Model lazy-load race condition (2026-07-31)**
+  - **Root cause**: `WhisperSTTProvider` and `PiperTTSProvider` lazy-loaded models by checking `if self._model is None`. Concurrent requests saw `None` and loaded the model multiple times simultaneously, causing resource contention and garbled output.
+  - **Fix**: Added `asyncio.Lock()` to `_load_model()` and `_load_voice()` in both providers to serialize the loading step without bottlenecking subsequent transcription/synthesis calls.
+
+- **Overlapping recordings & unbound recording length (2026-07-31)**
+  - **Root cause**: Successive push-to-talk attempts could trigger new recordings before previous ones finished, and missed keyup events could leave the microphone recording indefinitely (generating 5MB+ files).
+  - **Fix**: Added a state check in `startListening()` to abort if `status !== "idle"`. Added a 15-second hard timeout via `setTimeout` to automatically stop recordings.
+
+- **Stuck Space key push-to-talk state (2026-07-31)**
+  - **Root cause**: If the Electron window lost focus while Space was held down, the browser missed the `keyup` event. Additionally, default browser behavior for Space sometimes interfered with clean event delivery. The internal recording state could become desynced from the application state.
+  - **Fix**: Added a `blur` event listener to force stop the recording on focus loss. Called `e.preventDefault()` on Space down. Refactored state checking to derive `isRecording` directly from the recorder's existence rather than a separate `isHolding` flag. Added `Escape` key handler with a `forceResetToIdle` function to manually force-reset to idle for robust recovery.
+
+
 - **Voice loop THINKING → IDLE with no reply (2026-07-24)**
   - **Root cause**: `MediaRecorder.start()` without a `timeslice` argument doesn't fire `ondataavailable` until `stop()` is called, but `VoiceRecorder.stop()` immediately stops the stream and resolves before any data is collected. The recorded blob was empty/near-empty (0–3 KB, <0.2s), so Whisper transcribed empty string, and the frontend silently returned to idle.
   - **Fix**: Changed `this.mediaRecorder.start()` to `this.mediaRecorder.start(100)` in `frontend/src/lib/voice.ts` — this forces `ondataavailable` every 100ms while recording, ensuring chunks accumulate before `stop()` resolves.

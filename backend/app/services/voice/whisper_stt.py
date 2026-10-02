@@ -26,10 +26,11 @@ class WhisperSTTProvider(STTProvider):
     of push-to-talk audio is fast.
     """
 
-    def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8") -> None:
+    def __init__(self, model_size: str = "base", device: str = "cpu", compute_type: str = "int8", beam_size: int = 1) -> None:
         self._model_size = model_size
         self._device = device
         self._compute_type = compute_type
+        self._beam_size = beam_size
         self._model = None  # lazy-loaded on first use
         self._load_lock = asyncio.Lock()
 
@@ -55,6 +56,10 @@ class WhisperSTTProvider(STTProvider):
                 )
         return self._model
 
+    async def warmup(self) -> None:
+        """Load the Whisper model without transcribing user audio."""
+        await self._load_model()
+
     async def transcribe(self, audio_bytes: bytes, language: Optional[str] = None) -> str:
         """
         Transcribe audio bytes (WAV) to text.
@@ -77,11 +82,20 @@ class WhisperSTTProvider(STTProvider):
 
     def _transcribe_sync(self, model, audio_bytes: bytes, language: Optional[str]) -> str:
         logger.info(f"Whisper input: {len(audio_bytes)} bytes audio data")
+        
+        # Force English if no language is specified to prevent noise from 
+        # being hallucinated as Welsh, Urdu, etc.
+        if not language:
+            language = "en"
+            
         segments, info = model.transcribe(
             io.BytesIO(audio_bytes),
             language=language,
             vad_filter=True,
+            condition_on_previous_text=False,
+            beam_size=self._beam_size,
         )
+        
         text = " ".join(segment.text.strip() for segment in segments).strip()
         logger.info(f"Whisper output: '{text}' (length={len(text)}), duration={info.duration:.2f}s, language={info.language}")
         return text

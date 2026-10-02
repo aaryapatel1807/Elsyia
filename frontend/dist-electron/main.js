@@ -6,7 +6,7 @@
  * Stage 3; automation/tool bridges are intentionally deferred to their
  * respective future phases (see docs/ROADMAP.md).
  */
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, session } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
@@ -36,7 +36,15 @@ function createWindow() {
         win.loadFile(path.join(__dirname, "../dist/index.html"));
     }
 }
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+        callback(true);
+    });
+    session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+        return true;
+    });
+    createWindow();
+});
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin")
         app.quit();

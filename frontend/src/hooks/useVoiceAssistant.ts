@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { VoiceRecorder, speak, transcribe } from "@/lib/voice";
+import { VoiceRecorder, speak, transcribe, AudioQueue, fetchSpeechUrl } from "@/lib/voice";
 import type { AssistantStatus } from "@/components/Orb";
 
 const API_BASE = "http://127.0.0.1:8000/api/v1";
@@ -8,6 +8,15 @@ const MAX_RECORDING_MS = 15000;
 interface ChatApiResponse {
   response: string;
   conversation_id: string;
+}
+
+interface ToolResult {
+  status: string;
+  tool_name: string;
+  result?: unknown;
+  error?: string | null;
+  confirmation_required?: boolean;
+  confirmation_message?: string | null;
 }
 
 /**
@@ -22,10 +31,12 @@ export function useVoiceAssistant() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string>("");
   const [reply, setReply] = useState<string>("");
+  const [toolResult, setToolResult] = useState<ToolResult | null>(null);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const autoStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioQueueRef = useRef<AudioQueue | null>(null);
 
   const isRecording = useCallback(() => recorderRef.current !== null, []);
 
@@ -57,23 +68,115 @@ export function useVoiceAssistant() {
         body: JSON.stringify({
           message: text,
           conversation_id: conversationIdRef.current,
-          stream: false,
+          stream: true,
         }),
       });
       if (!chatResponse.ok) {
         throw new Error(`Chat request failed: ${chatResponse.status}`);
       }
-      const data = (await chatResponse.json()) as ChatApiResponse;
-      conversationIdRef.current = data.conversation_id;
-      setReply(data.response);
 
       setStatus("speaking");
-      await speak(data.response);
-      setStatus("idle");
+      setReply("");
+      setToolResult(null);
+
+      const reader = chatResponse.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let fullReply = "";
+      let currentSentence = "";
+      let accumulatedChunk = "";
+      
+      const audioQueue = new AudioQueue();
+      audioQueue.onComplete = () => {
+        setStatus("idle");
+      };
+      audioQueueRef.current = audioQueue;
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          accumulatedChunk += decoder.decode(value, { stream: true });
+          
+          let lines = accumulatedChunk.split('\n');
+          accumulatedChunk = lines.pop() || ''; 
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.type === 'token') {
+                  fullReply += data.content;
+                  setToolResult(null);
+                  currentSentence += data.content;
+                  setReply(fullReply);
+                  
+                  // Sentence boundary detection (now including commas for ultra-fast first response)
+                  if (/[.,!?:](\s|\n)/.test(currentSentence) || currentSentence.split(' ').length > 12) {
+                    const sentenceToSpeak = currentSentence.trim();
+                    currentSentence = ""; 
+                    if (sentenceToSpeak.length > 0) {
+                      fetchSpeechUrl(sentenceToSpeak).then(url => {
+                        audioQueue.enqueue(url);
+                      }).catch(err => console.error("Failed to fetch audio for chunk:", err));
+                    }
+                  }
+                } else if (data.type === 'tool') {
+                  const toolReply = data.content || "";
+                  setReply(toolReply);
+                  setToolResult(data.tool_result || null);
+                  if (toolReply.trim()) {
+                    fetchSpeechUrl(toolReply).then(url => {
+                      audioQueue.enqueue(url);
+                    }).catch(err => console.error("Failed to fetch tool result audio:", err));
+                  }
+                } else if (data.type === 'done') {
+                  conversationIdRef.current = data.conversation_id;
+                  if (currentSentence.trim().length > 0) {
+                    fetchSpeechUrl(currentSentence.trim()).then(url => {
+                      audioQueue.enqueue(url);
+                    }).catch(err => console.error("Failed to fetch audio for chunk:", err));
+                  }
+                } else if (data.type === 'error') {
+                  console.error("LLM Error:", data.error);
+                }
+              } catch (e) {
+                console.error("Failed to parse SSE data:", dataStr);
+              }
+            }
+          }
+        }
+      }
     } catch (err) {
       setLastError(err instanceof Error ? err.message : "Voice pipeline failed.");
       setStatus("idle");
     }
+  }, []);
+
+  const forceResetToIdle = useCallback(async () => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+
+    if (autoStopTimeoutRef.current) {
+      clearTimeout(autoStopTimeoutRef.current);
+      autoStopTimeoutRef.current = null;
+    }
+
+    if (recorder) {
+      try {
+        await recorder.stop();
+      } catch (e) {
+        console.error("Failed to stop recorder during force reset", e);
+      }
+    }
+
+    if (audioQueueRef.current) {
+      audioQueueRef.current.stop();
+      audioQueueRef.current = null;
+    }
+
+    setStatus("idle");
+    setLastError(null);
   }, []);
 
   const startListening = useCallback(async () => {
@@ -95,5 +198,5 @@ export function useVoiceAssistant() {
     }
   }, [status, stopListeningAndRespond]);
 
-  return { status, transcript, reply, lastError, startListening, stopListeningAndRespond, isRecording };
+  return { status, transcript, reply, toolResult, lastError, startListening, stopListeningAndRespond, forceResetToIdle, isRecording };
 }

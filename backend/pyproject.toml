@@ -17,6 +17,11 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.26.0",
     "python-multipart>=0.0.6",
+    "cryptography>=42.0.0",
+    "pycaw>=20251023; sys_platform == 'win32'",
+    "comtypes>=1.4.0; sys_platform == 'win32'",
+    "playwright>=1.62.0; sys_platform == 'win32'",
+
     "pyyaml>=6.0.1",
     # AI/ML
     "faster-whisper>=0.10.0",
