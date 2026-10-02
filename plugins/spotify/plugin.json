@@ -1,0 +1,14 @@
+{
+  "id": "jev-spotify",
+  "name": "Jev Spotify",
+  "version": "1.0.0",
+  "description": "Voice control for Spotify: 'Jev, play lo-fi on Spotify' opens the search; playback via system media keys.",
+  "entrypoint": "backend/app/services/tools/integrations/media.py:OpenSpotifyTool",
+  "tools": ["open_spotify", "media_control"],
+  "voice_triggers": ["play {query} on spotify", "open spotify", "pause", "next song"],
+  "capabilities": ["open.spotify.com search deep links", "play/pause/next/previous via media keys"],
+  "limits": ["full Web API playback control needs per-user OAuth and Spotify Premium — documented as a future step, not faked", "media keys are Windows-only and need DESKTOP_INPUT_ENABLED=true"],
+  "permissions": ["open_url", "input.media_keys"],
+  "enabled_by_default": true,
+  "trusted": true
+}

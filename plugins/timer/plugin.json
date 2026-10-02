@@ -1,0 +1,14 @@
+{
+  "id": "jev-timer",
+  "name": "Jev Timer",
+  "version": "1.0.0",
+  "description": "Voice timers: 'Jev, set a timer for 10 minutes called pasta'. Implemented on the local reminder store so timers survive restarts.",
+  "entrypoint": "backend/app/services/tools/integrations/productivity.py:SetTimerTool",
+  "tools": ["set_timer"],
+  "voice_triggers": ["set a timer for {n} minutes", "set a timer for {n} minutes called {label}"],
+  "capabilities": ["1 minute to 24 hours", "persistent via local SQLite reminders"],
+  "limits": ["delivery uses the existing reminder worker — no separate alarm sound yet"],
+  "permissions": ["local.reminders"],
+  "enabled_by_default": true,
+  "trusted": true
+}

@@ -1,0 +1,14 @@
+{
+  "id": "jev-linkedin",
+  "name": "Jev LinkedIn",
+  "version": "1.0.0",
+  "description": "Voice control for LinkedIn: open feed, jobs, keyword search, or profiles via deep links.",
+  "entrypoint": "backend/app/services/tools/integrations/media.py:OpenLinkedInTool",
+  "tools": ["open_linkedin"],
+  "voice_triggers": ["open linkedin", "open linkedin jobs", "search linkedin for {query}"],
+  "capabilities": ["feed, jobs, search and profile deep links"],
+  "limits": ["posting via API needs a LinkedIn partnership and is not available — Jev does not fake it"],
+  "permissions": ["open_url"],
+  "enabled_by_default": true,
+  "trusted": true
+}

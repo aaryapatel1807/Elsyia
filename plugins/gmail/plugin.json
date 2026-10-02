@@ -1,0 +1,14 @@
+{
+  "id": "jev-gmail",
+  "name": "Jev Gmail",
+  "version": "1.0.0",
+  "description": "Gmail inside Jev: check unread, search, read, and send email on voice command via the official Gmail API. Aarya authorises his own Google account on first run (OAuth desktop flow).",
+  "entrypoint": "backend/app/services/jev/gmail.py",
+  "tools": ["check_gmail", "search_gmail", "read_gmail", "send_gmail", "connect_gmail"],
+  "voice_triggers": ["check my email", "search my emails for {query}", "send email to {address} subject {subject} saying {body}", "connect gmail"],
+  "capabilities": ["unread inbox with sender/subject/snippet", "Gmail search operators", "plain-text message bodies", "send email"],
+  "limits": ["sending needs confirmation (Jev asks first)", "requires one-time OAuth setup by Aarya — no credentials in the repo", "never touched during development; tests mock the API"],
+  "permissions": ["google.oauth.gmail", "open_url"],
+  "enabled_by_default": true,
+  "trusted": true
+}

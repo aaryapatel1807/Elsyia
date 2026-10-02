@@ -1,0 +1,14 @@
+{
+  "id": "jev-youtube",
+  "name": "Jev YouTube",
+  "version": "1.0.0",
+  "description": "Voice control for YouTube: 'Jev, play X on YouTube'. Resolves the exact video with the free YouTube Data API when a key is configured, otherwise opens YouTube search. Playback control via system media keys.",
+  "entrypoint": "backend/app/services/tools/integrations/media.py:PlayYouTubeTool",
+  "tools": ["play_youtube", "media_control"],
+  "voice_triggers": ["play {query} on youtube", "pause", "next song", "previous"],
+  "capabilities": ["open exact video via free Data API quota", "search deep link fallback", "play/pause/next/previous via media keys"],
+  "limits": ["without YOUTUBE_API_KEY opens search results instead of the exact video", "media keys are Windows-only and need DESKTOP_INPUT_ENABLED=true"],
+  "permissions": ["open_url", "input.media_keys"],
+  "enabled_by_default": true,
+  "trusted": true
+}

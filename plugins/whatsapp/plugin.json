@@ -1,0 +1,14 @@
+{
+  "id": "jev-whatsapp",
+  "name": "Jev WhatsApp",
+  "version": "1.0.0",
+  "description": "Voice messaging via WhatsApp: 'Jev, message mom on WhatsApp saying I'll be late'. Opens the right chat with text prefilled via wa.me deep links, ready to send.",
+  "entrypoint": "backend/app/services/tools/integrations/media.py:MessageWhatsAppTool",
+  "tools": ["message_whatsapp"],
+  "voice_triggers": ["message {person} on whatsapp saying {text}", "whatsapp {number} {text}"],
+  "capabilities": ["wa.me deep link with prefilled text", "named contacts from ~/.jev/contacts.json"],
+  "limits": ["no free official API exists for personal WhatsApp messaging or reading chats — Jev never scrapes or automates WhatsApp; Aarya presses send himself", "names must be in contacts.json or given as international-format numbers"],
+  "permissions": ["open_url"],
+  "enabled_by_default": true,
+  "trusted": true
+}

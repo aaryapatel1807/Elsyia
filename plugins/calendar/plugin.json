@@ -1,0 +1,14 @@
+{
+  "id": "jev-calendar",
+  "name": "Jev Calendar",
+  "version": "1.0.0",
+  "description": "Google Calendar inside Jev: today's agenda and event creation on voice command via the official Calendar API. Same OAuth pattern as Gmail.",
+  "entrypoint": "backend/app/services/jev/calendar.py",
+  "tools": ["calendar_today", "create_calendar_event", "connect_calendar"],
+  "voice_triggers": ["what's on my calendar", "schedule {title} at {iso-datetime}", "connect calendar"],
+  "capabilities": ["today's agenda in time order", "create events with title/start/end"],
+  "limits": ["creating events needs confirmation", "requires one-time OAuth setup by Aarya"],
+  "permissions": ["google.oauth.calendar"],
+  "enabled_by_default": true,
+  "trusted": true
+}
