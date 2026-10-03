@@ -226,6 +226,56 @@ it to change how aggressive the cleanup is.
 
 ---
 
+### Agent mode — say it and it's done
+
+Open the Jev overlay and expand **▸ Agent mode**. Type one command that
+needs several things to happen, and Jev plans and runs the whole chain:
+
+> "grab my flight info from Gmail, put it on my calendar, and text Mom the details"
+
+Behind that sentence: your local Ollama model breaks the command into an
+ordered plan against Jev's real tool list (never invented tools), then
+runs it step by step — search Gmail → read the flight email → create the
+calendar event → open WhatsApp with the message prefilled. Outputs are
+threaded forward, so the flight details found in step 2 become the
+calendar event and the WhatsApp text. Each step narrates itself in the
+overlay ("Finding your flight email… ✓"), and Jev speaks a summary at
+the end.
+
+A few more things it handles:
+
+> "find the Q3 report in my email and send the summary to Priya on WhatsApp"
+> "what's on my calendar today, and remind me about the dentist at 6pm"
+
+**The rules it runs by:**
+
+- **Fast path first.** A single simple action ("what time is it") never
+  touches the planner — the deterministic router handles it instantly.
+  The planner only engages for multi-step commands.
+- **Reads are silent, outward actions ask.** Anything that acts on the
+  outside world — sending an email, creating a calendar event — pauses
+  the plan and waits for your tap (or "yes") before continuing. The rest
+  of the plan resumes exactly where it stopped.
+- **At most 5 steps** per plan (`JEV_AGENT_MAX_STEPS`), each with its own
+  timeout (`JEV_AGENT_STEP_TIMEOUT_S`, 60 seconds default).
+- **Failure is honest.** If step 2 of 4 fails, the plan stops, keeps the
+  partial results, and tells you exactly what succeeded and where it got
+  stuck. Nothing is silently skipped.
+
+**Honest limits:** chaining is only as capable as the underlying
+integrations. WhatsApp opens the chat with your message prefilled —
+there is no free official API for personal WhatsApp, so you still tap
+send yourself. LinkedIn opens deep links; it can't post. And the planner
+is only as clever as your local model — if it can't break a command
+down, it says so instead of guessing.
+
+Developers: `POST /jev/agent` (add `stream: true` for live server-sent
+step events), `POST /jev/agent/{plan_id}/confirm` to resume after a
+confirmation pause, `GET /jev/agent/status` for health. The planner
+prompt lives in `prompts/agent-planner.txt`.
+
+---
+
 ## 💻 Desktop app — install it, don't build it
 
 Jev ships as a real desktop app: double-click the installer and it just
