@@ -24,16 +24,25 @@ import json
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.core import get_logger, get_settings
+from app.core import TTSError, get_logger, get_settings
 from app.services.jev.agent import get_agent_runner
 from app.services.jev.calendar import CalendarClient, calendar_oauth
 from app.services.jev.gmail import GmailClient, gmail_oauth
 from app.services.jev.loop import get_jev_loop
 from app.services.jev.persona import JEV_NAME
+from app.services.jev.voice_picker import (
+    PREVIEW_TEXT,
+    VoiceNotAvailable,
+    download_voice_async,
+    list_voices,
+    preview_wav,
+    resolve_active_voice,
+    select_voice,
+)
 from app.services.jev.wakeword import WakeWordUnavailable, get_wakeword_service
 from app.services.jev.mcp_client import get_mcp_manager
 from app.services.jev.see import SeeUnavailable, get_see_service
@@ -148,7 +157,7 @@ async def jev_status() -> dict[str, Any]:
     try:
         get_tts_provider(settings.DEFAULT_TTS_PROVIDER)
         status["tts"] = {"ready": True, "provider": settings.DEFAULT_TTS_PROVIDER,
-                         "voice": settings.PIPER_VOICE}
+                         "voice": resolve_active_voice()}
     except Exception as exc:  # noqa: BLE001
         status["tts"] = {"ready": False, "error": str(exc)}
     status["wakeword"] = get_wakeword_service().status()
@@ -538,3 +547,113 @@ async def jev_see_ask(request: JevSeeAskRequest) -> dict[str, Any]:
     except SeeUnavailable as exc:
         return {"ok": False, "answer": str(exc), "timings_ms": {"total_ms": 0}}
     return {"ok": True, **result}
+
+
+# --- Voice picker (Jev's speaking voice, Jarvis-style) ---
+
+
+class VoiceSelectRequest(BaseModel):
+    voice_id: str = Field(..., min_length=1, max_length=80)
+
+
+class VoicePreviewRequest(BaseModel):
+    voice_id: str = Field(..., min_length=1, max_length=80)
+    text: str | None = Field(default=None, max_length=400)
+
+
+class VoiceDownloadRequest(BaseModel):
+    voice_id: str = Field(..., min_length=1, max_length=80)
+
+
+@router.get("/voice/list")
+async def jev_voice_list() -> dict[str, Any]:
+    """All known Piper voices: installed ones, downloadable ones, active one."""
+    return list_voices()
+
+
+@router.post("/voice/select")
+async def jev_voice_select(request: VoiceSelectRequest) -> dict[str, Any]:
+    """Switch Jev's speaking voice. Hot — no restart needed.
+
+    The voice must already be downloaded (see POST /jev/voice/download).
+    """
+    try:
+        active = select_voice(request.voice_id)
+    except VoiceNotAvailable as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    # Hot-swap the cached provider so the next utterance uses the new voice.
+    from app.services.voice.factory import set_tts_voice
+    set_tts_voice(active)
+    return {"ok": True, "active": active}
+
+
+@router.post("/voice/preview")
+async def jev_voice_preview(request: VoicePreviewRequest) -> StreamingResponse:
+    """Hear a sample line in a voice WITHOUT changing the active voice."""
+    text = (request.text or PREVIEW_TEXT).strip() or PREVIEW_TEXT
+    if len(text) > 400:
+        text = text[:400]
+    try:
+        wav = await preview_wav(request.voice_id, text)
+    except VoiceNotAvailable as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except TTSError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    async def generate():
+        yield wav
+
+    return StreamingResponse(generate(), media_type="audio/wav")
+
+
+@router.post("/voice/download")
+async def jev_voice_download(request: VoiceDownloadRequest) -> StreamingResponse:
+    """Download a Piper voice (explicit only). Streams SSE progress events.
+
+    Events: ``progress`` {file, downloaded, total}, then ``done`` {voice}
+    or ``error`` {error}.
+    """
+    from app.services.jev.voice_picker import is_valid_voice_id, installed_voices
+
+    voice_id = request.voice_id.strip()
+    if not is_valid_voice_id(voice_id):
+        raise HTTPException(status_code=400,
+                            detail=f"'{request.voice_id}' is not a Piper voice id.")
+    if voice_id in installed_voices():
+        raise HTTPException(status_code=409,
+                            detail=f"Voice '{voice_id}' is already downloaded.")
+
+    async def events():
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        finished = asyncio.Event()
+        error: list = []
+
+        def progress_cb(downloaded: int, total: int | None, filename: str) -> None:
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"file": filename, "downloaded": downloaded, "total": total},
+            )
+
+        async def run() -> None:
+            try:
+                await download_voice_async(voice_id, progress_cb=progress_cb)
+            except Exception as exc:  # noqa: BLE001
+                error.append(str(exc))
+            finally:
+                finished.set()
+
+        task = asyncio.create_task(run())
+        while not finished.is_set() or not queue.empty():
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=0.25)
+            except asyncio.TimeoutError:
+                continue
+            yield f"event: progress\ndata: {json.dumps(item)}\n\n"
+        await task
+        if error:
+            yield f"event: error\ndata: {json.dumps({'error': error[0]})}\n\n"
+        else:
+            yield f"event: done\ndata: {json.dumps({'voice': voice_id})}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
