@@ -12,12 +12,20 @@ import AdminPanel from "@/components/AdminPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import JevOverlay from "@/components/JevOverlay";
+import SeeSelect from "@/components/SeeSelect";
 
 const isJevOverlay =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("overlay") === "jev";
 
+const isSeeSelect =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("overlay") === "see";
+
 export default function App() {
+  if (isSeeSelect) {
+    return <SeeSelect />;
+  }
   if (isJevOverlay) {
     return <JevOverlay />;
   }

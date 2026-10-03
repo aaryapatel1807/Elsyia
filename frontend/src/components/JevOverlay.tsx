@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioQueue, VoiceRecorder, fetchSpeechUrl } from "@/lib/voice";
+import { AudioQueue, VoiceRecorder, fetchSpeechUrl, transcribe } from "@/lib/voice";
 import type { AssistantStatus } from "@/components/Orb";
 import { apiBase } from "../lib/api";
 
@@ -12,11 +12,22 @@ declare global {
   interface Window {
     elysia?: {
       version: string;
-      onJevSummon?: (cb: (info?: { wake: boolean; dictate?: boolean }) => void) => () => void;
+      onJevSummon?: (cb: (info?: { wake: boolean; dictate?: boolean; see?: boolean; thumbnail?: string }) => void) => () => void;
       hideJevOverlay?: () => void;
       setWakeWordPolling?: (enabled: boolean) => void;
       /** Fired when the wake-word switch changes elsewhere (e.g. tray menu). */
       onWakeWordState?: (cb: (on: boolean) => void) => () => void;
+      /** [jev-see] Region-select overlay: report the user-dragged
+       * rectangle (CSS px). This is the only path that leads to a
+       * screen capture. */
+      selectSeeRegion?: (rect: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }) => void;
+      /** [jev-see] Cancel the region select — no capture happens. */
+      cancelSeeSelect?: () => void;
     };
   }
 }
@@ -154,6 +165,19 @@ export default function JevOverlay() {
     tool: string;
     message: string;
   } | null>(null);
+
+  // --- Screen-aware mode ("circle anything, then just ask"). ---
+  // Entered only via the explicit region-select hotkey (Ctrl+Shift+S);
+  // the overlay never captures on its own.
+  const [seeMode, setSeeMode] = useState(false);
+  const [seeThumb, setSeeThumb] = useState<string | null>(null);
+  const [seeQuestion, setSeeQuestion] = useState("");
+  const [seeAnswer, setSeeAnswer] = useState("");
+  const [seeOk, setSeeOk] = useState(true);
+  const [seeBusy, setSeeBusy] = useState(false);
+  const [seeMs, setSeeMs] = useState<number | null>(null);
+  const [seeVoiceAsking, setSeeVoiceAsking] = useState(false);
+  const seeRecorderRef = useRef<VoiceRecorder | null>(null);
 
   const stopAll = useCallback(() => {
     audioQueueRef.current?.stop();
@@ -362,6 +386,97 @@ export default function JevOverlay() {
     [endWakeTurn]
   );
 
+  // --- Screen-aware mode ("circle anything, then just ask"). ---
+  // Entered ONLY via the explicit region-select hotkey; the overlay
+  // never captures on its own.
+
+  /** Enter see-mode after an explicit region capture. */
+  const enterSeeMode = useCallback(
+    (thumbnail?: string) => {
+      stopAll();
+      setError(null);
+      setSeeMode(true);
+      setSeeThumb(thumbnail ?? null);
+      setSeeQuestion("");
+      setSeeAnswer("");
+      setSeeOk(true);
+      setSeeMs(null);
+    },
+    [stopAll]
+  );
+
+  const exitSeeMode = useCallback(() => {
+    seeRecorderRef.current = null;
+    setSeeVoiceAsking(false);
+    setSeeMode(false);
+    setSeeThumb(null);
+    setSeeQuestion("");
+    setSeeAnswer("");
+  }, []);
+
+  /** Ask a question about the current explicit capture. */
+  const askSee = useCallback(
+    async (question: string) => {
+      const q = question.trim();
+      if (!q || seeBusy) return;
+      setSeeBusy(true);
+      setError(null);
+      setSeeAnswer("");
+      setStatus("thinking");
+      try {
+        const res = await fetch(`${API_BASE}/jev/see`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: q }),
+        });
+        if (!res.ok) throw new Error(`See failed: ${res.status}`);
+        const data = (await res.json()) as {
+          ok: boolean;
+          answer: string;
+          timings_ms?: { total_ms?: number };
+        };
+        setSeeOk(!!data.ok);
+        setSeeAnswer(data.answer);
+        setSeeMs(data.timings_ms?.total_ms ?? null);
+        speakReply(data.answer);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Screen-aware failed.");
+        setStatus("idle");
+      } finally {
+        setSeeBusy(false);
+      }
+    },
+    [seeBusy, speakReply]
+  );
+
+  /** Ask by voice: record, transcribe, then ask about the capture. */
+  const askSeeByVoice = useCallback(async () => {
+    const active = seeRecorderRef.current;
+    if (active) {
+      seeRecorderRef.current = null;
+      setSeeVoiceAsking(false);
+      try {
+        const audio = await active.stop();
+        const text = await transcribe(audio);
+        if (text.trim()) {
+          setSeeQuestion(text.trim());
+          await askSee(text.trim());
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Microphone failed.");
+      }
+      return;
+    }
+    try {
+      const recorder = new VoiceRecorder();
+      await recorder.start();
+      seeRecorderRef.current = recorder;
+      setSeeVoiceAsking(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Microphone access failed.");
+    }
+  }, [askSee]);
+
   const runTurn = useCallback(
     async (audioBlob: Blob, confirmed: string[]) => {
       try {
@@ -525,8 +640,8 @@ export default function JevOverlay() {
     [applyAgentStep, speakReply]
   );
 
-  const runAgent = useCallback(async () => {
-    const message = agentInput.trim();
+  const runAgent = useCallback(async (override?: string) => {
+    const message = (override ?? agentInput).trim();
     if (!message || agentBusy) return;
     stopAll();
     setError(null);
@@ -552,6 +667,17 @@ export default function JevOverlay() {
       setStatus("idle");
     }
   }, [agentInput, agentBusy, stopAll, handleAgentEvent]);
+
+  /** [jev-see] Hand the see-mode question to agent mode: the planner can
+   * chain see_capture into real tools (e.g. send_gmail) with its
+   * normal confirm gates. */
+  const doItWithAgent = useCallback(() => {
+    const q = seeQuestion.trim();
+    if (!q) return;
+    setSeeMode(false);
+    setAgentMode(true);
+    void runAgent(q);
+  }, [seeQuestion, runAgent]);
 
   const confirmAgentRun = useCallback(async () => {
     if (!agentPending) return;
@@ -596,6 +722,10 @@ export default function JevOverlay() {
         toggleDictation();
         return;
       }
+      if (info?.see) {
+        enterSeeMode(info.thumbnail);
+        return;
+      }
       if (info?.wake) {
         wakeTurnRef.current = true;
         playWakeChime();
@@ -603,13 +733,23 @@ export default function JevOverlay() {
       void startListening();
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !dictateMode) {
+      if (e.code === "Space" && seeMode && !dictateMode) {
+        // In see-mode, Space asks about the capture by voice.
+        e.preventDefault();
+        if (!e.repeat) void askSeeByVoice();
+      } else if (e.code === "Space" && !dictateMode) {
         e.preventDefault();
         if (!e.repeat && status === "idle") void startListening();
         if (!e.repeat && status === "listening") void stopListeningAndRespond();
       }
       if (e.code === "Escape") {
         e.preventDefault();
+        // Esc in see-mode just leaves see-mode; the capture itself
+        // expires from memory on its own TTL.
+        if (seeMode) {
+          exitSeeMode();
+          return;
+        }
         // Esc mid-dictation always cancels the whole dictation turn.
         if (dictateMode) {
           cancelDictation();
@@ -636,6 +776,10 @@ export default function JevOverlay() {
     dictateMode,
     toggleDictation,
     cancelDictation,
+    seeMode,
+    enterSeeMode,
+    exitSeeMode,
+    askSeeByVoice,
   ]);
 
   // Wake-word toggle: explicit opt-in for the always-on listener.
@@ -791,6 +935,18 @@ export default function JevOverlay() {
           font-weight: 600; cursor: pointer;
           background: linear-gradient(135deg, #4f7cff, #8a5cff); color: white; }
         .jev-agent-run:disabled { opacity: 0.5; cursor: default; }
+        /* [jev-see] Screen-aware mode: reuses the overlay's panel/input/
+           chip language — thumbnail preview, privacy microcopy, Q&A row. */
+        .jev-see { width: 100%; margin-top: 14px; -webkit-app-region: no-drag; }
+        .jev-see-thumb { padding: 12px; border-radius: 16px;
+          background: rgba(120,140,255,0.08);
+          border: 1px solid rgba(120,140,255,0.25); box-sizing: border-box; }
+        .jev-see-thumb img { width: 100%; border-radius: 10px; display: block;
+          margin-top: 8px; }
+        .jev-see-privacy { margin-top: 8px; font-size: 11px; color: #6d6d85;
+          letter-spacing: 0.06em; }
+        .jev-see-row { display: flex; gap: 8px; margin-top: 10px; }
+        .jev-chip-btn { cursor: pointer; font: inherit; }
       `}</style>
 
       <div className="jev-title">JEV</div>
@@ -831,7 +987,73 @@ export default function JevOverlay() {
         {error && <div className="jev-error">{error}</div>}
       </div>
 
-      {dictateMode ? (
+      {seeMode ? (
+        <div className="jev-see">
+          {seeThumb && (
+            <div className="jev-see-thumb">
+              <div className="jev-dictate-label">screen capture</div>
+              <img src={seeThumb} alt="Selected screen region" />
+              <div className="jev-see-privacy">Jev only looks when you ask.</div>
+            </div>
+          )}
+          <div className="jev-dictate-label" style={{ marginTop: 12 }}>
+            what about it?
+          </div>
+          <div className="jev-see-row">
+            <input
+              className="jev-agent-input"
+              value={seeQuestion}
+              onChange={(e) => setSeeQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void askSee(seeQuestion);
+              }}
+              placeholder="e.g. what is this error? · solve 2x+7=15"
+              disabled={seeBusy}
+              aria-label="Question about the screen capture"
+            />
+            <button
+              className="jev-agent-run"
+              onClick={() => void askSee(seeQuestion)}
+              disabled={seeBusy || !seeQuestion.trim()}
+            >
+              {seeBusy ? "…" : "Ask"}
+            </button>
+          </div>
+          <div className="jev-see-row">
+            <button
+              className="jev-chip jev-chip-btn"
+              onClick={() => void askSeeByVoice()}
+              disabled={seeBusy}
+            >
+              {seeVoiceAsking ? "Stop & ask" : "Ask by voice"}
+            </button>
+            <button className="jev-chip jev-chip-btn" onClick={exitSeeMode}>
+              Close
+            </button>
+          </div>
+          {seeAnswer && (
+            <div className="jev-reply" style={{ marginTop: 12 }}>
+              {seeAnswer}
+            </div>
+          )}
+          {seeMs != null && (
+            <div className="jev-timing">
+              answered in {(seeMs / 1000).toFixed(1)}s
+            </div>
+          )}
+          {seeAnswer && seeOk && (
+            <div className="jev-chips">
+              <button
+                className="jev-chip jev-chip-btn"
+                onClick={doItWithAgent}
+                disabled={!seeQuestion.trim()}
+              >
+                Do it with agent mode
+              </button>
+            </div>
+          )}
+        </div>
+      ) : dictateMode ? (
         <>
           {dictateText && !dictateRecording && !dictateBusy && (
             <div className="jev-dictate-preview">
