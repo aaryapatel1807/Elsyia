@@ -140,6 +140,47 @@ Everything Jev owns lives in `~/.jev/` (override with `JEV_DATA_DIR`):
 `notes.md`, and per-service Google OAuth tokens. Plain files, human-readable,
 yours to edit.
 
+### Wake word — hands-free summoning
+
+Jev can listen for a wake phrase and summon itself, "Hey Siri" style. The
+listener is a tiny on-device keyword spotter (openWakeWord, local ONNX
+inference): it idles on the microphone watching only for the phrase, then
+plays a chime, opens the overlay, and starts the normal voice loop. When
+your turn finishes, it goes back to sleep.
+
+**It is off by default.** Turn it on with the **Wake word** checkbox in the
+Jev overlay — the always-on microphone is your explicit choice. You can
+also start the backend with `JEV_WAKE_ENABLED=true`; the checkbox state is
+remembered in `~/.jev/wakeword.json`.
+
+**Privacy:** no audio ever leaves your machine. The mic stream is scored
+in 80 ms frames on-device and discarded immediately — nothing is recorded,
+stored, or transmitted. While a turn runs, the listener pauses itself so
+Jev's own reply can't wake it again.
+
+**Out of the box** it listens for **"hey jarvis"** (openWakeWord's
+community model, downloaded automatically on first use). To teach it
+**"hey jev"** in your own voice:
+
+1. Record ~50 short clips of yourself saying "hey jev" (vary distance and
+   room), plus ~20 clips of background noise and silence.
+2. Train a model with the openWakeWord training notebook
+   ([Google Colab](https://colab.research.google.com/github/dscripka/openWakeWord/blob/main/notebooks/train_openwakeword.ipynb))
+   and export the `.onnx` file.
+3. Drop it into `~/.jev/wakeword/hey_jev.onnx` and set
+   `JEV_WAKE_MODEL=~/.jev/wakeword/hey_jev.onnx` in `backend/.env`.
+4. Restart the backend and flip the toggle — the overlay shows the active
+   phrase. `JEV_WAKE_THRESHOLD` (default 0.5) trades false wakes against
+   missed ones; raise it if Jev wakes up uninvited.
+
+**Cost:** roughly 1–3% of one CPU core and ~50 MB RAM while listening; the
+model file is about 1 MB.
+
+**Troubleshooting:** if the toggle reports the listener unavailable,
+`pip install openwakeword sounddevice` (on Linux you also need the
+`libportaudio2` system package). The test suite covers the trigger wiring
+with a faked mic and model — no audio hardware needed.
+
 ---
 
 ## 🚀 Tech Stack
