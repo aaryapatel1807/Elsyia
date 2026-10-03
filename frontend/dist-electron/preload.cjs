@@ -47,4 +47,16 @@ electron_1.contextBridge.exposeInMainWorld("elysia", {
         electron_1.ipcRenderer.on("jev-wakeword-state", listener);
         return () => electron_1.ipcRenderer.removeListener("jev-wakeword-state", listener);
     },
+    /**
+     * [jev-see] Region-select overlay: report the user-dragged rectangle
+     * (CSS pixels, relative to the select window). This is the only path
+     * that leads to a screen capture.
+     */
+    selectSeeRegion: (rect) => {
+        electron_1.ipcRenderer.send("jev-see-region", rect);
+    },
+    /** [jev-see] Cancel the region select (Esc) — no capture happens. */
+    cancelSeeSelect: () => {
+        electron_1.ipcRenderer.send("jev-see-cancel");
+    },
 });
