@@ -26,6 +26,7 @@ from app.services.browser import browser_manager
 from app.services.tools.reminders import reminder_worker
 from app.services.voice.factory import get_stt_provider, get_tts_provider
 from app.services.jev.wakeword import get_wakeword_service
+from app.services.jev.mcp_client import get_mcp_manager
 
 from app.core.logging import setup_logging
 
@@ -122,6 +123,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         get_wakeword_service().startup()
     except Exception as exc:  # noqa: BLE001 — wake word is optional
         logger.warning("[STARTUP] Wake-word listener skipped: %s", exc)
+    try:
+        get_mcp_manager().startup()
+    except Exception as exc:  # noqa: BLE001 — MCP is optional
+        logger.warning("[STARTUP] MCP client skipped: %s", exc)
     
     yield
     
@@ -131,6 +136,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if not warmup_task.done():
             warmup_task.cancel()
     get_wakeword_service().shutdown()
+    try:
+        await get_mcp_manager().aclose()
+    except Exception as exc:  # noqa: BLE001 — best-effort session close
+        logger.warning("[SHUTDOWN] MCP close skipped: %s", exc)
 
     # Shutdown
 

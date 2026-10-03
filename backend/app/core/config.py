@@ -769,6 +769,18 @@ class Settings(BaseSettings):
         description="Show the cleaned-text preview (Type it / Re-record / Cancel) before typing",
     )
 
+    # === Jev MCP (Model Context Protocol): community integrations ===
+    JEV_MCP_ENABLED: bool = Field(
+        default=True,
+        description="Connect user-configured MCP servers at startup (background, "
+        "graceful degradation — a dead server never breaks Jev)",
+    )
+    JEV_MCP_CONFIG: str = Field(
+        default="~/.jev/mcp.json",
+        description="Path to the MCP servers config file — the trust boundary: "
+        "only servers listed here ever run",
+    )
+
     # === Jev agent mode ("say it and it's done" multi-step chaining) ===
     JEV_AGENT_MAX_STEPS: int = Field(
         default=5,

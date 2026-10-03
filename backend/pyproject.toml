@@ -37,6 +37,8 @@ dependencies = [
     "sounddevice>=0.4.6",
     # Jev dictation mode: type into the focused app (pynput keyboard injection)
     "pynput>=1.7.7",
+    # Jev MCP client: community integrations via the Model Context Protocol
+    "mcp>=1.0.0",
 ]
 
 [project.optional-dependencies]

@@ -35,6 +35,7 @@ from app.services.jev.gmail import GmailClient, gmail_oauth
 from app.services.jev.loop import get_jev_loop
 from app.services.jev.persona import JEV_NAME
 from app.services.jev.wakeword import WakeWordUnavailable, get_wakeword_service
+from app.services.jev.mcp_client import get_mcp_manager
 from app.services.llm.factory import get_llm_provider
 from app.services.voice.factory import get_stt_provider, get_tts_provider
 
@@ -150,6 +151,7 @@ async def jev_status() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         status["tts"] = {"ready": False, "error": str(exc)}
     status["wakeword"] = get_wakeword_service().status()
+    status["mcp"] = get_mcp_manager().summary()
     return status
 
 
@@ -470,3 +472,19 @@ async def jev_agent_confirm(plan_id: str, request: AgentConfirmRequest):
             status_code=409, detail="Plan is not awaiting confirmation."
         )
     return _agent_to_response(plan)
+
+
+# --- MCP (Model Context Protocol): community integrations ---
+
+
+@router.get("/mcp/status")
+async def mcp_status() -> dict[str, Any]:
+    """Per-server MCP status: transport, availability, tool counts, errors."""
+    return get_mcp_manager().status()
+
+
+@router.post("/mcp/refresh")
+async def mcp_refresh() -> dict[str, Any]:
+    """Reconnect all configured MCP servers (picks up config edits)."""
+    await get_mcp_manager().refresh()
+    return get_mcp_manager().status()
