@@ -226,6 +226,49 @@ it to change how aggressive the cleanup is.
 
 ---
 
+### Jev's voice — pick the Jarvis voice
+
+Jev speaks with Piper, a free neural text-to-speech engine that runs
+entirely on your machine. Out of the box Jev uses **en_GB-alan-medium** —
+a deep British male voice, chosen because it is the closest free Piper
+voice to the Jarvis/butler archetype (and a natural fit for a butler
+named Jev). If you prefer an American voice, `en_US-ryan-medium` is the
+closest male alternative. Character is subjective, so listen and pick
+your favourite — switching is instant and needs no restart.
+
+**API** (no UI changes — this is all endpoints and config):
+
+- `GET /jev/voice/list` — every known voice: which are downloaded, which
+  can be fetched, and which one is active.
+- `POST /jev/voice/preview` `{"voice_id": "...", "text": "..."}` — hear a
+  sample line in that voice *without* changing the active one.
+- `POST /jev/voice/download` `{"voice_id": "..."}` — fetch a voice from
+  HuggingFace (streams progress). Explicit only: Jev never downloads
+  voices on its own.
+- `POST /jev/voice/select` `{"voice_id": "..."}` — make it Jev's voice.
+  Takes effect immediately; the choice is remembered in
+  `~/.jev/voice.json`.
+
+Example:
+
+```bash
+curl -s localhost:8000/api/v1/jev/voice/list | python3 -m json.tool
+curl -X POST localhost:8000/api/v1/jev/voice/download \
+  -H 'Content-Type: application/json' -d '{"voice_id":"en_US-ryan-medium"}'
+# then, after the download finishes:
+curl -X POST localhost:8000/api/v1/jev/voice/select \
+  -H 'Content-Type: application/json' -d '{"voice_id":"en_US-ryan-medium"}'
+```
+
+**Config:** `JEV_TTS_VOICE` in `backend/.env` sets the default voice;
+a persisted choice from `/jev/voice/select` overrides it. The underlying
+provider default is `PIPER_VOICE` (now `en_GB-alan-medium`); downloaded
+voices live in `models/piper/`. The full catalogue of downloadable
+voices is at <https://huggingface.co/rhasspy/piper-voices> — any voice id
+in Piper's `lang_REGION-name-quality` shape can be fetched.
+
+---
+
 ### Agent mode — say it and it's done
 
 Open the Jev overlay and expand **▸ Agent mode**. Type one command that
