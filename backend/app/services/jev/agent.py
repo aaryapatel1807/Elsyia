@@ -102,6 +102,7 @@ _ARG_HINTS: dict[str, str] = {
     "draft_text": '{"instruction": "<what to draft>"}',
     "get_current_time": '{}',
     "get_current_date": '{}',
+    "see_capture": '{"question": "<what to look at in the user\'s current screen capture>"}',
     "launch_application": '{"application": "<app name>"}',
 }
 

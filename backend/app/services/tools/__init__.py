@@ -75,6 +75,7 @@ from app.services.tools.integrations import (
     TakeNoteTool,
 )
 from app.services.tools.vision_tools import CaptureScreenTool, OcrImageTool
+from app.services.tools.see_tools import SeeCaptureTool
 from app.services.tools.web_tools import (
     FetchUrlTool,
     GetWorldFinanceNewsTool,
@@ -132,6 +133,7 @@ AVAILABLE_TOOLS: list[Tool] = [
     CodeRepositoryStatusTool(),
     CaptureScreenTool(),
     OcrImageTool(),
+    SeeCaptureTool(),
     # --- Jev integrations ---
     PlayYouTubeTool(),
     MediaControlTool(),

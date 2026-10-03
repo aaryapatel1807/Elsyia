@@ -36,6 +36,7 @@ from app.services.jev.loop import get_jev_loop
 from app.services.jev.persona import JEV_NAME
 from app.services.jev.wakeword import WakeWordUnavailable, get_wakeword_service
 from app.services.jev.mcp_client import get_mcp_manager
+from app.services.jev.see import SeeUnavailable, get_see_service
 from app.services.llm.factory import get_llm_provider
 from app.services.voice.factory import get_stt_provider, get_tts_provider
 
@@ -488,3 +489,52 @@ async def mcp_refresh() -> dict[str, Any]:
     """Reconnect all configured MCP servers (picks up config edits)."""
     await get_mcp_manager().refresh()
     return get_mcp_manager().status()
+
+
+# --- Screen-aware mode ("circle anything, then just ask") ---
+
+
+class JevSeeAskRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    capture_id: str | None = None
+
+
+@router.get("/see/status")
+async def jev_see_status() -> dict[str, Any]:
+    """Vision pipeline health: model, Ollama, and whether a capture exists."""
+    return await get_see_service().status()
+
+
+@router.post("/see/capture")
+async def jev_see_capture(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Store an explicit region capture.
+
+    Called by the Electron shell right after the user's region select.
+    This is the ONLY endpoint that creates a capture — Jev never
+    screenshots on its own.
+    """
+    data = await file.read()
+    if len(data) > 8 * 1024 * 1024:
+        return {"ok": False, "error": "Capture too large (8 MB limit)."}
+    try:
+        stored = get_see_service().store_capture(data)
+    except SeeUnavailable as exc:
+        return {"ok": False, "error": str(exc)}
+    status = await get_see_service().status()
+    return {"ok": True, **stored, "model_available": status["model_available"]}
+
+
+@router.post("/see")
+async def jev_see_ask(request: JevSeeAskRequest) -> dict[str, Any]:
+    """Ask a question about the current explicit screen capture.
+
+    Always returns 200 with an `ok` flag so the overlay can speak the
+    outcome naturally either way.
+    """
+    try:
+        result = await get_see_service().answer(
+            request.question, capture_id=request.capture_id
+        )
+    except SeeUnavailable as exc:
+        return {"ok": False, "answer": str(exc), "timings_ms": {"total_ms": 0}}
+    return {"ok": True, **result}

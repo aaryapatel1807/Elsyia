@@ -795,6 +795,26 @@ class Settings(BaseSettings):
         description="Per-step timeout for agent-mode tool execution",
     )
 
+    # === Jev screen-aware mode ("circle anything, then just ask") ===
+    JEV_SEE_HOTKEY: str = Field(
+        default="CommandOrControl+Shift+S",
+        description="Global hotkey opening the region-select capture "
+        "(read by the Electron shell at launch). The ONLY trigger for "
+        "screen capture — Jev never screenshots in the background.",
+    )
+    JEV_SEE_MODEL: str = Field(
+        default="moondream",
+        description="Local Ollama vision model for screen-aware Q&A "
+        "(`ollama pull moondream` once on the machine)",
+    )
+    JEV_SEE_CAPTURE_TTL_S: int = Field(
+        default=600,
+        ge=60,
+        le=3600,
+        description="How long an explicit screen capture stays answerable "
+        "before it is discarded from memory",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
