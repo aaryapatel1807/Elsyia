@@ -276,6 +276,64 @@ prompt lives in `prompts/agent-planner.txt`.
 
 ---
 
+### MCP — build your own integrations
+
+The Model Context Protocol is an open standard for giving AI assistants
+tools. Instead of Jev hand-writing every integration, it acts as an MCP
+*client*: any community MCP server you list in `~/.jev/mcp.json` gets
+connected at startup, and its tools appear in Jev as
+`mcp.<server>.<tool>` — usable from plain chat and from agent-mode
+plans, with outputs threading between steps like any built-in tool.
+
+**Add a server (about 2 minutes):**
+
+```bash
+# 1. Install a community server — three verified examples:
+pip install mcp-server-sqlite        # local SQLite database tools
+pip install mcp-server-fetch         # fetch web pages as markdown
+npx -y @modelcontextprotocol/server-filesystem  # local file tools (no install; npx fetches it)
+
+# 2. Copy the example config and enable what you want:
+cp docs/mcp.example.json ~/.jev/mcp.json
+# then edit ~/.jev/mcp.json — set "enabled": true on your servers
+
+# 3. Restart the backend (or POST /jev/mcp/refresh — no restart needed)
+```
+
+Then say *"list my MCP servers"* — or check `GET /jev/mcp/status` for
+per-server availability, tool counts, and errors.
+
+**Confirmation policy.** MCP tools follow the same gate as built-ins:
+read-only tools run silently; anything that writes, sends, deletes, or
+executes asks for your confirmation first. Per server you can set
+`"confirm": "all"` (paranoid) or `"none"` (never ask — only for servers
+you fully trust; not recommended).
+
+**Security, plainly stated:**
+
+- Only servers listed in `~/.jev/mcp.json` ever run. That file is the
+  trust boundary — Jev never downloads, installs, or launches an MCP
+  server on its own, and never adds entries to the file itself.
+- A dead or hostile server can't break Jev: connections happen in the
+  background, failures mark the server unavailable, and everything else
+  keeps working.
+- A remote (SSE) server sees every argument you send it. Only point Jev
+  at servers you trust, especially remote ones.
+- MCP tools never bypass the confirmation gate — there is no silent
+  path around it.
+
+**Honest limits:** MCP tools are only as good as their servers, and the
+agent-mode planner only picks them when their descriptions match your
+command — give your servers clear `"description"`-friendly names. The
+fetch server needs outbound network access; on restricted machines it
+will list its tools fine but fetches may fail.
+
+Developers: `GET /jev/mcp/status`, `POST /jev/mcp/refresh`,
+`GET /jev/status` (includes an `mcp` summary). The client lives in
+`backend/app/services/jev/mcp_client.py`.
+
+---
+
 ## 💻 Desktop app — install it, don't build it
 
 Jev ships as a real desktop app: double-click the installer and it just
