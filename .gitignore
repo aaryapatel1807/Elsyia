@@ -73,6 +73,8 @@ frontend/build/
 
 # Electron
 frontend/release/
+# Staged PyInstaller backend binary (rebuilt per platform by build:backend)
+frontend/resources/
 
 # OS
 Thumbs.db

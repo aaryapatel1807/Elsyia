@@ -9,6 +9,10 @@ export interface JevSummonInfo {
   wake: boolean;
   /** [jev-dictation] True when the summon toggles dictation mode (record/type). */
   dictate?: boolean;
+  /** [jev-see] True when the summon follows an explicit region capture. */
+  see?: boolean;
+  /** [jev-see] Data-URL thumbnail of the captured region, when see is true. */
+  thumbnail?: string;
 }
 
 contextBridge.exposeInMainWorld("elysia", {
@@ -52,5 +56,22 @@ contextBridge.exposeInMainWorld("elysia", {
     const listener = (_event: unknown, on: boolean) => callback(on);
     ipcRenderer.on("jev-wakeword-state", listener);
     return () => ipcRenderer.removeListener("jev-wakeword-state", listener);
+  },
+  /**
+   * [jev-see] Region-select overlay: report the user-dragged rectangle
+   * (CSS pixels, relative to the select window). This is the only path
+   * that leads to a screen capture.
+   */
+  selectSeeRegion: (rect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): void => {
+    ipcRenderer.send("jev-see-region", rect);
+  },
+  /** [jev-see] Cancel the region select (Esc) — no capture happens. */
+  cancelSeeSelect: (): void => {
+    ipcRenderer.send("jev-see-cancel");
   },
 });

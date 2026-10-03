@@ -1,19 +1,31 @@
 /**
  * Elysia Electron main process.
  *
- * Phase 1 responsibilities only: create the floating window and load the
- * renderer. Push-to-talk (global shortcut → backend STT) is wired here in
- * Stage 3; automation/tool bridges are intentionally deferred to their
- * respective future phases (see docs/ROADMAP.md).
+ * - Main window: the full Elysia desktop.
+ * - Jev overlay: a small always-on-top summon window, toggled from
+ *   anywhere with the global hotkey Ctrl+Shift+J (Cmd+Shift+J on macOS).
+ *   The overlay runs Jev's tight voice loop (mic -> Whisper -> Ollama
+ *   -> actions -> TTS) through the backend /jev endpoints.
  */
-import { app, BrowserWindow, session } from "electron";
+import { app, BrowserWindow, globalShortcut, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// [jev-packaging] Desktop-app modules: backend supervisor, tray, first-run.
+import { getBackendUrl, startBackend, stopBackend } from "./backend-launcher.js";
+import { getSetting, setSetting } from "./app-settings.js";
+import { applyStoredLoginSetting, createTray, refreshTrayMenu, registerWakeWordControl } from "./tray.js";
+import { isOllamaReachable, showSetupWindow } from "./first-run.js";
+// [jev-dictation] Global hotkey module (say it, it types). Additive — the
+// overlay owns the record/stop/type toggle state; main only forwards presses.
+import { registerDictationHotkey } from "./dictation.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isDev = !app.isPackaged;
-function createWindow() {
-    const win = new BrowserWindow({
+const JEV_HOTKEY = "CommandOrControl+Shift+J";
+let mainWindow = null;
+let jevOverlay = null;
+function createMainWindow() {
+    mainWindow = new BrowserWindow({
         width: 1100,
         height: 750,
         minWidth: 720,
@@ -21,29 +33,201 @@ function createWindow() {
         backgroundColor: "#05050a",
         frame: false,
         titleBarStyle: "hidden",
-        transparent: false,
         webPreferences: {
-            preload: path.join(__dirname, "preload.js"),
+            preload: path.join(__dirname, "preload.cjs"),
             contextIsolation: true,
             nodeIntegration: false,
         },
     });
     if (isDev) {
-        win.loadURL("http://localhost:5173");
-        win.webContents.openDevTools({ mode: "detach" });
+        mainWindow.loadURL("http://localhost:5173");
+        mainWindow.webContents.openDevTools({ mode: "detach" });
     }
     else {
-        win.loadFile(path.join(__dirname, "../dist/index.html"));
+        mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
+    }
+    mainWindow.on("closed", () => {
+        mainWindow = null;
+    });
+}
+function createJevOverlay() {
+    jevOverlay = new BrowserWindow({
+        width: 400,
+        height: 580,
+        minWidth: 360,
+        minHeight: 480,
+        backgroundColor: "#00000000",
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        show: false,
+        webPreferences: {
+            preload: path.join(__dirname, "preload.cjs"),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
+    });
+    if (isDev) {
+        jevOverlay.loadURL("http://localhost:5173/?overlay=jev");
+    }
+    else {
+        jevOverlay.loadFile(path.join(__dirname, "../dist/index.html"), {
+            query: { overlay: "jev" },
+        });
+    }
+    jevOverlay.on("closed", () => {
+        jevOverlay = null;
+    });
+    return jevOverlay;
+}
+/** Toggle the Jev overlay from anywhere in the OS. */
+function summonJev(wake = false) {
+    const win = jevOverlay ?? createJevOverlay();
+    if (win.isVisible()) {
+        win.hide();
+    }
+    else {
+        win.show();
+        win.focus();
+        win.webContents.send("jev-summon", { wake });
     }
 }
-app.whenReady().then(() => {
-    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+/**
+ * Wake-word polling: while the listener toggle is on, ask the backend
+ * twice a second whether the wake phrase was heard. A hit summons Jev
+ * exactly like the global hotkey, flagged as a hands-free wake.
+ *
+ * [jev-packaging] The backend URL is dynamic in the packaged app (the
+ * launcher picks a free loopback port), so it is resolved per poll.
+ */
+const wakePollUrl = () => `${getBackendUrl()}/api/v1/jev/wakeword/event`;
+let wakePollTimer = null;
+/** [jev-packaging] Main-process view of the wake-word switch (tray + overlay sync). */
+let wakeWordOn = false;
+async function pollWakeWord() {
+    try {
+        const res = await fetch(wakePollUrl());
+        if (!res.ok)
+            return;
+        const data = (await res.json());
+        if (data.wake) {
+            console.log("[Jev] Wake word heard — summoning");
+            summonJev(true);
+        }
+    }
+    catch {
+        // Backend not up (yet) — stay quiet and keep polling.
+    }
+}
+function setWakeWordPolling(enabled) {
+    if (wakePollTimer) {
+        clearInterval(wakePollTimer);
+        wakePollTimer = null;
+    }
+    if (enabled) {
+        console.log("[Jev] Wake-word polling started");
+        wakePollTimer = setInterval(() => void pollWakeWord(), 500);
+    }
+    else {
+        console.log("[Jev] Wake-word polling stopped");
+    }
+}
+/**
+ * [jev-packaging] Central wake-word switch: drives the backend listener
+ * service, the main-process poller, the persisted setting, the overlay
+ * checkbox and the tray menu from one place.
+ */
+async function setWakeWordEnabled(on) {
+    wakeWordOn = on;
+    setWakeWordPolling(on);
+    setSetting("wakeWordEnabled", on);
+    try {
+        await fetch(`${getBackendUrl()}/api/v1/jev/wakeword/${on ? "enable" : "disable"}`, {
+            method: "POST",
+        });
+    }
+    catch {
+        // Backend not up yet — the overlay retries on its next toggle/status fetch.
+    }
+    for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send("jev-wakeword-state", on);
+    }
+    refreshTrayMenu();
+}
+app.whenReady().then(async () => {
+    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
         callback(true);
     });
-    session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
-        return true;
+    session.defaultSession.setPermissionCheckHandler(() => true);
+    // [jev-packaging] Boot the backend first; a real error dialog, never a blank screen.
+    try {
+        const url = await startBackend();
+        console.log(`[Jev] backend ready at ${url}`);
+    }
+    catch (err) {
+        console.error(`[Jev] backend failed to start: ${err}`);
+        // startBackend already showed the error dialog.
+        app.quit();
+        return;
+    }
+    // [jev-packaging] Tray icon + start-at-login, and the wake-word tray hook.
+    createTray({ onSummon: () => summonJev(false) });
+    registerWakeWordControl({
+        isEnabled: () => wakeWordOn,
+        setEnabled: (on) => void setWakeWordEnabled(on),
     });
-    createWindow();
+    applyStoredLoginSetting();
+    if (getSetting("wakeWordEnabled", false)) {
+        void setWakeWordEnabled(true);
+    }
+    const registered = globalShortcut.register(JEV_HOTKEY, () => summonJev(false));
+    if (!registered) {
+        console.error(`[Jev] Failed to register global hotkey ${JEV_HOTKEY}`);
+    }
+    else {
+        console.log(`[Jev] Global hotkey registered: ${JEV_HOTKEY}`);
+    }
+    // [jev-dictation] Say-it-it-types hotkey (default Ctrl+Shift+D, override
+    // with JEV_DICTATION_HOTKEY). Forwards to the overlay, which toggles
+    // recording -> stop/process -> preview -> type into the focused app.
+    registerDictationHotkey({
+        onToggle: () => {
+            const win = jevOverlay ?? createJevOverlay();
+            if (!win.isVisible())
+                win.show();
+            win.webContents.send("jev-summon", { wake: false, dictate: true });
+        },
+    });
+    ipcMain.on("jev-hide-overlay", () => {
+        jevOverlay?.hide();
+    });
+    ipcMain.on("jev-wakeword-polling", (_event, enabled) => {
+        void setWakeWordEnabled(enabled === true);
+    });
+    ipcMain.on("jev-open-external", (_event, url) => {
+        if (typeof url === "string" && /^https?:\/\//.test(url)) {
+            shell.openExternal(url);
+        }
+    });
+    // [jev-packaging] First-run: Ollama check before showing the desktop.
+    // Jev's brain is not bundled (multi-GB weights), so guide the install.
+    if (await isOllamaReachable()) {
+        createMainWindow();
+    }
+    else {
+        console.log("[Jev] Ollama not reachable — showing first-run setup");
+        showSetupWindow(path.join(__dirname, "preload.cjs"), () => createMainWindow());
+    }
+});
+app.on("will-quit", () => {
+    if (wakePollTimer) {
+        clearInterval(wakePollTimer);
+        wakePollTimer = null;
+    }
+    stopBackend(); // [jev-packaging] kill the backend child process
+    globalShortcut.unregisterAll();
 });
 app.on("window-all-closed", () => {
     if (process.platform !== "darwin")
@@ -51,5 +235,5 @@ app.on("window-all-closed", () => {
 });
 app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0)
-        createWindow();
+        createMainWindow();
 });

@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "esModuleInterop": true
   },
-  "include": ["main.ts", "preload.ts", "backend-launcher.ts", "tray.ts", "app-settings.ts", "first-run.ts"]
+  "include": ["main.ts", "backend-launcher.ts", "tray.ts", "app-settings.ts", "first-run.ts"]
 }
