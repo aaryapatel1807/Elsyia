@@ -25,6 +25,7 @@ from app.services.jev.calendar import CalendarClient, calendar_oauth
 from app.services.jev.gmail import GmailClient, gmail_oauth
 from app.services.jev.loop import get_jev_loop
 from app.services.jev.persona import JEV_NAME
+from app.services.jev.wakeword import WakeWordUnavailable, get_wakeword_service
 from app.services.llm.factory import get_llm_provider
 from app.services.voice.factory import get_stt_provider, get_tts_provider
 
@@ -139,7 +140,58 @@ async def jev_status() -> dict[str, Any]:
                          "voice": settings.PIPER_VOICE}
     except Exception as exc:  # noqa: BLE001
         status["tts"] = {"ready": False, "error": str(exc)}
+    status["wakeword"] = get_wakeword_service().status()
     return status
+
+
+# --- Wake word (hands-free summoning) ---
+
+
+@router.get("/wakeword/status")
+async def wakeword_status() -> dict[str, Any]:
+    """Wake-word listener state: enabled, listening, model, availability."""
+    return get_wakeword_service().status()
+
+
+@router.post("/wakeword/enable")
+async def wakeword_enable() -> dict[str, Any]:
+    """Turn the always-on listener on (explicit opt-in). 503 if unavailable."""
+    from fastapi import HTTPException
+
+    try:
+        return get_wakeword_service().set_enabled(True)
+    except WakeWordUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/wakeword/disable")
+async def wakeword_disable() -> dict[str, Any]:
+    """Turn the always-on listener off."""
+    return get_wakeword_service().set_enabled(False)
+
+
+@router.get("/wakeword/event")
+async def wakeword_event() -> dict[str, Any]:
+    """Poll for a wake event. Returns and clears it; {"wake": false} otherwise.
+
+    The Electron shell polls this ~twice a second while the toggle is on and
+    summons the Jev overlay when a wake event arrives.
+    """
+    return get_wakeword_service().take_event() or {"wake": False}
+
+
+@router.post("/wakeword/pause")
+async def wakeword_pause() -> dict[str, Any]:
+    """Suspend scoring while a Jev turn runs (so Jev's reply can't re-trigger)."""
+    get_wakeword_service().pause()
+    return get_wakeword_service().status()
+
+
+@router.post("/wakeword/resume")
+async def wakeword_resume() -> dict[str, Any]:
+    """Resume scoring after a Jev turn finishes."""
+    get_wakeword_service().resume()
+    return get_wakeword_service().status()
 
 
 # --- Gmail ---

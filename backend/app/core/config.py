@@ -735,6 +735,30 @@ class Settings(BaseSettings):
         description="Google OAuth client secret (alternative to JEV_GOOGLE_CLIENT_JSON)",
     )
 
+    # === Jev wake word (hands-free summoning) ===
+    JEV_WAKE_ENABLED: bool = Field(
+        default=False,
+        description="Start the always-on wake-word listener with the backend "
+        "(default off — the overlay toggle is the explicit opt-in)",
+    )
+    JEV_WAKE_MODEL: str = Field(
+        default="hey_jarvis",
+        description="Wake-word model: an openWakeWord model name (downloaded on "
+        "first use) or a path to a custom .onnx/.tflite file",
+    )
+    JEV_WAKE_THRESHOLD: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Detection confidence threshold (higher = fewer false wakes)",
+    )
+    JEV_WAKE_COOLDOWN_S: int = Field(
+        default=45,
+        ge=5,
+        le=300,
+        description="Quiet period after a wake event so Jev's own reply can't re-trigger",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

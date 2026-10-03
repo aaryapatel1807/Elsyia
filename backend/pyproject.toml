@@ -32,6 +32,9 @@ dependencies = [
     "google-api-python-client>=2.100.0",
     "google-auth-oauthlib>=1.2.0",
     "google-auth-httplib2>=0.2.0",
+    # Jev wake word: on-device keyword spotting (openWakeWord) + mic capture
+    "openwakeword>=0.6.0",
+    "sounddevice>=0.4.6",
 ]
 
 [project.optional-dependencies]

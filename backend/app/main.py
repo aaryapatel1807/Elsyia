@@ -25,6 +25,7 @@ from app.services.sync.relay import create_relay_router
 from app.services.browser import browser_manager
 from app.services.tools.reminders import reminder_worker
 from app.services.voice.factory import get_stt_provider, get_tts_provider
+from app.services.jev.wakeword import get_wakeword_service
 
 from app.core.logging import setup_logging
 
@@ -117,6 +118,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         warmup_tasks.append(asyncio.create_task(_prewarm_local_model()))
     if settings.VOICE_PREWARM:
         warmup_tasks.append(asyncio.create_task(_prewarm_voice_models()))
+    try:
+        get_wakeword_service().startup()
+    except Exception as exc:  # noqa: BLE001 — wake word is optional
+        logger.warning("[STARTUP] Wake-word listener skipped: %s", exc)
     
     yield
     
@@ -125,6 +130,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     for warmup_task in warmup_tasks:
         if not warmup_task.done():
             warmup_task.cancel()
+    get_wakeword_service().shutdown()
 
     # Shutdown
 
