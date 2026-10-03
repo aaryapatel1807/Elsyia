@@ -155,8 +155,14 @@ class Settings(BaseSettings):
 
     # Piper settings
     PIPER_VOICE: str = Field(
-        default="en_US-lessac-medium",
-        description="Piper voice model"
+        default="en_GB-alan-medium",
+        description="Default Piper voice model (Jev's Jarvis default: deep British male)"
+    )
+    JEV_TTS_VOICE: str = Field(
+        default="",
+        description="Jev's speaking voice override (Piper voice id). Empty = use the "
+                    "persisted choice in ~/.jev/voice.json, else the PIPER_VOICE default. "
+                    "Switch at runtime via POST /jev/voice/select — no restart needed."
     )
     PIPER_MODELS_DIR: str = Field(
         default="models/piper",

@@ -11,6 +11,7 @@ from app.core import ConfigurationError, get_logger, get_settings
 from app.services.voice.base import STTProvider, TTSProvider
 from app.services.voice.piper_tts import PiperTTSProvider
 from app.services.voice.whisper_stt import WhisperSTTProvider
+from app.services.jev.voice_picker import resolve_active_voice
 
 logger = get_logger("voice.factory")
 
@@ -64,7 +65,7 @@ def get_tts_provider(provider: Literal["piper"] = "piper") -> TTSProvider:
         logger.info(f"Creating TTS provider: {provider}")
         if provider == "piper":
             _tts_providers[provider] = PiperTTSProvider(
-                voice=settings.PIPER_VOICE,
+                voice=resolve_active_voice(),
                 models_dir=settings.PIPER_MODELS_DIR,
                 speed=settings.PIPER_SPEED,
             )
@@ -72,6 +73,22 @@ def get_tts_provider(provider: Literal["piper"] = "piper") -> TTSProvider:
             raise ConfigurationError(f"Unknown TTS provider: {provider}", details={"provider": provider})
     
     return _tts_providers[provider]
+
+
+def set_tts_voice(voice: str) -> TTSProvider:
+    """Hot-swap the cached Piper provider to a new voice — no restart needed.
+
+    In-flight syntheses keep their old provider instance; every later
+    get_tts_provider() call returns the new voice.
+    """
+    settings = get_settings()
+    logger.info(f"Hot-swapping TTS voice to: {voice}")
+    _tts_providers["piper"] = PiperTTSProvider(
+        voice=voice,
+        models_dir=settings.PIPER_MODELS_DIR,
+        speed=settings.PIPER_SPEED,
+    )
+    return _tts_providers["piper"]
 
 
 # Deprecated aliases for backward compatibility
