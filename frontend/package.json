@@ -1,13 +1,17 @@
 {
   "name": "elysia-frontend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "npm run build:electron",
     "build:vite": "tsc && vite build",
+    "build:electron": "tsc && vite build && tsc -p electron/tsconfig.json",
+    "build:backend": "node scripts/build-backend.js",
+    "dist": "npm run build:backend && npm run build:electron && electron-builder",
+    "dist:dir": "npm run build:backend && npm run build:electron && electron-builder --dir",
     "electron:dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --outDir dist-electron --watch\" \"wait-on http://localhost:5173 dist-electron/main.js && electron .\"",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx"
@@ -33,5 +37,59 @@
     "typescript": "^5.5.4",
     "vite": "^5.4.2",
     "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.aaryapatel.jev",
+    "productName": "Jev",
+    "directories": {
+      "buildResources": "build-resources",
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/backend",
+        "to": "backend"
+      },
+      {
+        "from": "resources/icons",
+        "to": "icons"
+      },
+      {
+        "from": "../backend/models/wakeword",
+        "to": "backend/wakeword"
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build-resources/icons/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Jev",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "build-resources/icons/icon.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build-resources/icons",
+      "category": "Utility",
+      "description": "Jev — your local voice assistant"
+    }
   }
 }

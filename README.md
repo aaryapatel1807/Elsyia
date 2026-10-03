@@ -183,6 +183,67 @@ with a faked mic and model — no audio hardware needed.
 
 ---
 
+## 💻 Desktop app — install it, don't build it
+
+Jev ships as a real desktop app: double-click the installer and it just
+works. No terminal, no `npm run`, no manually starting the Python
+backend — the installer bundles the frozen backend and the Electron
+shell, which starts everything for you.
+
+### How a release happens (automatic)
+
+1. A version tag is pushed, e.g. `git tag v0.2.0 && git push origin v0.2.0`.
+2. The `.github/workflows/release.yml` workflow builds the installers on
+   GitHub-hosted runners — `windows-latest` (backend `.exe` frozen with
+   PyInstaller + nsis installer), `macos-latest` (dmg), `ubuntu-latest`
+   (AppImage). This is also what solves the Windows build problem: the
+   `.exe` is compiled on a real Windows machine in the cloud.
+3. A GitHub Release is created on the tag with all three installers
+   attached. Download yours from the Releases page — that is the whole
+   process; you never run a build command yourself.
+
+### Building manually (optional)
+
+Prerequisites per OS: Node 18+, Python 3.11+ with the backend venv
+(`cd backend && uv sync`), and Ollama installed separately (see below).
+
+```bash
+cd frontend
+npm run dist        # full installer for THIS machine's OS
+npm run dist:dir    # unpacked app for testing (no installer)
+npm run build:backend  # freeze the backend only (stages into resources/)
+```
+
+A Windows `.exe` must be built on Windows and the `.dmg` on macOS —
+PyInstaller and electron-builder cannot cross-compile the backend.
+The release workflow above handles this for you.
+
+### First launch
+
+- The backend starts automatically on a free local port; the app waits
+  for its health check and shows a proper error dialog (never a blank
+  screen) if something goes wrong. Backend logs live in the app-data
+  `logs/backend.log`.
+- **Ollama is not bundled** (multi-gigabyte weights). If it is missing,
+  a setup screen walks you through installing it and running
+  `ollama pull qwen2.5:1.5b`.
+- **Whisper, Piper and wake-word models download on first use** into the
+  app-data dir (Whisper → HuggingFace cache, Piper → `models/piper`,
+  wake-word → openWakeWord cache). The installer stays small.
+- Your data (databases, notes, OAuth tokens, settings) lives in the
+  OS app-data dir (`~/.config/Jev` on Linux,
+  `%APPDATA%/Jev` on Windows, `~/Library/Application Support/Jev` on macOS).
+
+### Honest notes
+
+- Installers are **unsigned** (code-signing certificates cost money): on
+  first launch Windows SmartScreen may warn — choose *More info → Run
+  anyway*; on macOS right-click the app → *Open*. This is normal for
+  unsigned apps.
+- The backend is a single-file executable that unpacks on each launch;
+  if `/tmp` is tiny, set `TMPDIR` to a roomier directory.
+- System tray: Show/Hide Jev, wake-word toggle, start-at-login, Quit.
+
 ## 🚀 Tech Stack
 
 ### Frontend
