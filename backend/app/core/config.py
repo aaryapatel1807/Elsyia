@@ -769,6 +769,20 @@ class Settings(BaseSettings):
         description="Show the cleaned-text preview (Type it / Re-record / Cancel) before typing",
     )
 
+    # === Jev agent mode ("say it and it's done" multi-step chaining) ===
+    JEV_AGENT_MAX_STEPS: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum tool steps the agent-mode planner may chain",
+    )
+    JEV_AGENT_STEP_TIMEOUT_S: int = Field(
+        default=60,
+        ge=5,
+        le=300,
+        description="Per-step timeout for agent-mode tool execution",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -10,17 +10,26 @@ Endpoints:
 - POST /jev/calendar/connect  start Google sign-in for Calendar
 - GET  /jev/calendar/status   Calendar authorisation state
 - GET  /jev/calendar/today    today's agenda (needs Calendar connected)
+- POST /jev/agent             agent mode: plan + execute a multi-step command
+- POST /jev/agent/{id}/confirm  resume a plan paused for confirmation
+- POST /jev/agent/{id}/cancel   cancel a running/paused plan
+- GET  /jev/agent/{id}        current state of a plan
+- GET  /jev/agent/status      agent-mode health: planner, caps, active plans
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.core import get_logger, get_settings
+from app.services.jev.agent import get_agent_runner
 from app.services.jev.calendar import CalendarClient, calendar_oauth
 from app.services.jev.gmail import GmailClient, gmail_oauth
 from app.services.jev.loop import get_jev_loop
@@ -316,3 +325,148 @@ async def jev_dictation_status() -> dict[str, Any]:
     from app.services.jev.dictation import dictation_status
 
     return dictation_status()
+
+
+# --- Agent mode ("say it and it's done" multi-step chaining) ---
+
+
+class AgentRunRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    confirmed: list[str] = Field(default_factory=list)
+    stream: bool = False
+
+
+class AgentConfirmRequest(BaseModel):
+    confirmed: list[str] = Field(default_factory=list)
+    stream: bool = False
+
+
+class AgentStepModel(BaseModel):
+    seq: int
+    tool: str
+    say: str
+    status: str
+    needs_confirm: bool = False
+    confirmation_message: str | None = None
+    result: Any | None = None
+    error: str | None = None
+    timing_ms: float = 0.0
+
+
+class AgentRunResponse(BaseModel):
+    plan_id: str
+    message: str
+    status: str
+    reply: str
+    steps: list[AgentStepModel]
+    timings_ms: dict[str, float]
+
+
+_TERMINAL_AGENT_EVENTS = {
+    "plan_completed", "plan_failed", "awaiting_confirmation", "no_plan",
+}
+
+
+def _agent_to_response(plan) -> AgentRunResponse:
+    return AgentRunResponse(
+        plan_id=plan.plan_id,
+        message=plan.message,
+        status=plan.status,
+        reply=plan.reply,
+        steps=[AgentStepModel(**s.to_dict()) for s in plan.steps],
+        timings_ms={k: round(v, 1) for k, v in plan.timings_ms.items()},
+    )
+
+
+async def _agent_sse(coro_factory) -> Any:
+    """Yield server-sent events until the runner emits a terminal event."""
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def emit(event: dict[str, Any]) -> None:
+        await queue.put(event)
+
+    task = asyncio.create_task(coro_factory(emit))
+    try:
+        while True:
+            event = await queue.get()
+            yield f"data: {json.dumps(event, default=str)}\n\n"
+            if event.get("type") in _TERMINAL_AGENT_EVENTS:
+                break
+        await task
+    finally:
+        if not task.done():
+            task.cancel()
+
+
+@router.get("/agent/status")
+async def jev_agent_status() -> dict[str, Any]:
+    """Agent-mode health: planner readiness, step caps, active plans."""
+    return get_agent_runner().status()
+
+
+@router.get("/agent/{plan_id}")
+async def jev_agent_plan(plan_id: str) -> dict[str, Any]:
+    """Current state of one agent plan (for polling or recovery)."""
+    from fastapi import HTTPException
+
+    plan = get_agent_runner().get_plan(plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired plan.")
+    return plan.to_dict()
+
+
+@router.post("/agent/{plan_id}/cancel")
+async def jev_agent_cancel(plan_id: str) -> dict[str, bool]:
+    """Cancel a running or confirmation-paused plan."""
+    return {"cancelled": get_agent_runner().cancel_plan(plan_id)}
+
+
+@router.post("/agent", response_model=AgentRunResponse)
+async def jev_agent_run(request: AgentRunRequest):
+    """Plan and execute a multi-step command.
+
+    Pass stream=true for server-sent events with live per-step progress
+    (plan_created, step_started, step_completed, awaiting_confirmation,
+    plan_completed, plan_failed). Destructive steps pause for confirmation;
+    resume with POST /jev/agent/{plan_id}/confirm.
+    """
+    runner = get_agent_runner()
+    confirmed = {c.strip() for c in request.confirmed if c.strip()}
+    if request.stream:
+        async def _run(emit) -> None:
+            await runner.run_text(
+                request.message, confirmed=confirmed, event_sink=emit
+            )
+
+        return StreamingResponse(_agent_sse(_run), media_type="text/event-stream")
+    plan = await runner.run_text(request.message, confirmed=confirmed)
+    return _agent_to_response(plan)
+
+
+@router.post("/agent/{plan_id}/confirm")
+async def jev_agent_confirm(plan_id: str, request: AgentConfirmRequest):
+    """Resume a confirmation-paused plan with freshly approved tools."""
+    from fastapi import HTTPException
+
+    runner = get_agent_runner()
+    if runner.get_plan(plan_id) is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired plan.")
+    confirmed = {c.strip() for c in request.confirmed if c.strip()}
+    if request.stream:
+        async def _resume(emit) -> None:
+            plan = await runner.confirm_plan(
+                plan_id, confirmed, event_sink=emit
+            )
+            if plan is None:
+                await emit({
+                    "type": "no_plan",
+                    "reply": "That plan is no longer awaiting confirmation.",
+                })
+
+        return StreamingResponse(_agent_sse(_resume), media_type="text/event-stream")
+    plan = await runner.confirm_plan(plan_id, confirmed)
+    if plan is None:
+        raise HTTPException(
+            status_code=409, detail="Plan is not awaiting confirmation."
+        )
+    return _agent_to_response(plan)
