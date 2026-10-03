@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiBase } from "../lib/api";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = apiBase();
 
 type ProcessingJob = {
   id: string;

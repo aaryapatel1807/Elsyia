@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiBase } from "../lib/api";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = apiBase();
 type Workspace = { id: string; name: string; created_at: string; updated_at: string };
 type Member = { id: string; display_name: string; role: string; status: string };
 type Policy = { key: string; enabled: boolean; updated_at: string };

@@ -4,6 +4,8 @@
  * permissions, lifecycle, confirmation, and audit decisions.
  */
 
+import { apiBase } from "../lib/api";
+
 export type PluginState = "discovered" | "enabled" | "disabled" | "blocked" | "failed" | string;
 
 export interface PluginInfo {
@@ -56,7 +58,7 @@ export class PluginClient {
   private readonly fetcher: typeof fetch;
 
   constructor(options: PluginClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? "http://127.0.0.1:8000/api/v1").replace(/\/$/, "");
+    this.baseUrl = (options.baseUrl ?? apiBase()).replace(/\/$/, "");
     this.fetcher = options.fetcher ?? fetch;
   }
 

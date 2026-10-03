@@ -7,9 +7,14 @@
  *   The overlay runs Jev's tight voice loop (mic -> Whisper -> Ollama
  *   -> actions -> TTS) through the backend /jev endpoints.
  */
-import { app, BrowserWindow, globalShortcut, ipcMain, session } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// [jev-packaging] Desktop-app modules: backend supervisor, tray, first-run.
+import { getBackendUrl, startBackend, stopBackend } from "./backend-launcher.js";
+import { getSetting, setSetting } from "./app-settings.js";
+import { applyStoredLoginSetting, createTray, refreshTrayMenu, registerWakeWordControl } from "./tray.js";
+import { isOllamaReachable, showSetupWindow } from "./first-run.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,13 +101,18 @@ function summonJev(wake = false): void {
  * Wake-word polling: while the listener toggle is on, ask the backend
  * twice a second whether the wake phrase was heard. A hit summons Jev
  * exactly like the global hotkey, flagged as a hands-free wake.
+ *
+ * [jev-packaging] The backend URL is dynamic in the packaged app (the
+ * launcher picks a free loopback port), so it is resolved per poll.
  */
-const WAKE_POLL_URL = "http://127.0.0.1:8000/api/v1/jev/wakeword/event";
+const wakePollUrl = (): string => `${getBackendUrl()}/api/v1/jev/wakeword/event`;
 let wakePollTimer: NodeJS.Timeout | null = null;
+/** [jev-packaging] Main-process view of the wake-word switch (tray + overlay sync). */
+let wakeWordOn = false;
 
 async function pollWakeWord(): Promise<void> {
   try {
-    const res = await fetch(WAKE_POLL_URL);
+    const res = await fetch(wakePollUrl());
     if (!res.ok) return;
     const data = (await res.json()) as { wake?: boolean };
     if (data.wake) {
@@ -127,15 +137,57 @@ function setWakeWordPolling(enabled: boolean): void {
   }
 }
 
-app.whenReady().then(() => {
+/**
+ * [jev-packaging] Central wake-word switch: drives the backend listener
+ * service, the main-process poller, the persisted setting, the overlay
+ * checkbox and the tray menu from one place.
+ */
+async function setWakeWordEnabled(on: boolean): Promise<void> {
+  wakeWordOn = on;
+  setWakeWordPolling(on);
+  setSetting("wakeWordEnabled", on);
+  try {
+    await fetch(`${getBackendUrl()}/api/v1/jev/wakeword/${on ? "enable" : "disable"}`, {
+      method: "POST",
+    });
+  } catch {
+    // Backend not up yet — the overlay retries on its next toggle/status fetch.
+  }
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send("jev-wakeword-state", on);
+  }
+  refreshTrayMenu();
+}
+
+app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(true);
   });
   session.defaultSession.setPermissionCheckHandler(() => true);
 
-  createMainWindow();
+  // [jev-packaging] Boot the backend first; a real error dialog, never a blank screen.
+  try {
+    const url = await startBackend();
+    console.log(`[Jev] backend ready at ${url}`);
+  } catch (err) {
+    console.error(`[Jev] backend failed to start: ${err}`);
+    // startBackend already showed the error dialog.
+    app.quit();
+    return;
+  }
 
-  const registered = globalShortcut.register(JEV_HOTKEY, summonJev);
+  // [jev-packaging] Tray icon + start-at-login, and the wake-word tray hook.
+  createTray({ onSummon: () => summonJev(false) });
+  registerWakeWordControl({
+    isEnabled: () => wakeWordOn,
+    setEnabled: (on: boolean) => void setWakeWordEnabled(on),
+  });
+  applyStoredLoginSetting();
+  if (getSetting<boolean>("wakeWordEnabled", false)) {
+    void setWakeWordEnabled(true);
+  }
+
+  const registered = globalShortcut.register(JEV_HOTKEY, () => summonJev(false));
   if (!registered) {
     console.error(`[Jev] Failed to register global hotkey ${JEV_HOTKEY}`);
   } else {
@@ -147,8 +199,23 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on("jev-wakeword-polling", (_event, enabled: boolean) => {
-    setWakeWordPolling(enabled === true);
+    void setWakeWordEnabled(enabled === true);
   });
+
+  ipcMain.on("jev-open-external", (_event, url: string) => {
+    if (typeof url === "string" && /^https?:\/\//.test(url)) {
+      shell.openExternal(url);
+    }
+  });
+
+  // [jev-packaging] First-run: Ollama check before showing the desktop.
+  // Jev's brain is not bundled (multi-GB weights), so guide the install.
+  if (await isOllamaReachable()) {
+    createMainWindow();
+  } else {
+    console.log("[Jev] Ollama not reachable — showing first-run setup");
+    showSetupWindow(path.join(__dirname, "preload.js"), () => createMainWindow());
+  }
 });
 
 app.on("will-quit", () => {
@@ -156,6 +223,7 @@ app.on("will-quit", () => {
     clearInterval(wakePollTimer);
     wakePollTimer = null;
   }
+  stopBackend(); // [jev-packaging] kill the backend child process
   globalShortcut.unregisterAll();
 });
 

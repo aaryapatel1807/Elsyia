@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioQueue, VoiceRecorder, fetchSpeechUrl } from "@/lib/voice";
 import type { AssistantStatus } from "@/components/Orb";
+import { apiBase } from "../lib/api";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = apiBase();
 const MAX_RECORDING_MS = 15000;
 
 declare global {
@@ -12,6 +13,8 @@ declare global {
       onJevSummon?: (cb: (info?: { wake: boolean }) => void) => () => void;
       hideJevOverlay?: () => void;
       setWakeWordPolling?: (enabled: boolean) => void;
+      /** Fired when the wake-word switch changes elsewhere (e.g. tray menu). */
+      onWakeWordState?: (cb: (on: boolean) => void) => () => void;
     };
   }
 }
@@ -294,6 +297,9 @@ export default function JevOverlay() {
         window.elysia?.setWakeWordPolling?.(!!s.enabled);
       })
       .catch(() => {});
+    // Stay in sync when the switch is flipped from the tray menu.
+    const off = window.elysia?.onWakeWordState?.((on: boolean) => setWakeOn(on));
+    return () => off?.();
   }, []);
 
   const toggleWakeWord = useCallback(async () => {

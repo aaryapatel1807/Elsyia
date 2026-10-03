@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { VoiceRecorder, speak, transcribe, AudioQueue, fetchSpeechUrl } from "@/lib/voice";
 import type { AssistantStatus } from "@/components/Orb";
+import { apiBase } from "../lib/api";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+const API_BASE = apiBase();
 const MAX_RECORDING_MS = 15000;
 
 interface ChatApiResponse {

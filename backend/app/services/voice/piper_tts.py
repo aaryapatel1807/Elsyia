@@ -51,15 +51,58 @@ class PiperTTSProvider(TTSProvider):
                 model_path = self._models_dir / f"{self._voice_name}.onnx"
                 config_path = self._models_dir / f"{self._voice_name}.onnx.json"
                 if not model_path.exists() or not config_path.exists():
-                    raise TTSError(
-                        f"Piper voice files not found for '{self._voice_name}' in "
-                        f"{self._models_dir}. Download the .onnx and .onnx.json pair "
-                        "from the Piper voices repo and place them there."
+                    logger.info(
+                        "Piper voice '%s' not found in %s — downloading (first run)…",
+                        self._voice_name,
+                        self._models_dir,
                     )
+                    try:
+                        await asyncio.to_thread(self._download_voice_files, model_path, config_path)
+                    except Exception as exc:
+                        raise TTSError(
+                            f"Piper voice files not found for '{self._voice_name}' in "
+                            f"{self._models_dir}, and the automatic download failed "
+                            f"({exc}). Download the .onnx and .onnx.json pair from "
+                            "the Piper voices repo and place them there."
+                        ) from exc
 
                 logger.info(f"Loading Piper voice '{self._voice_name}' from {self._models_dir}")
                 self._voice = PiperVoice.load(str(model_path), config_path=str(config_path))
         return self._voice
+
+    def _download_voice_files(self, model_path: Path, config_path: Path) -> None:
+        """Download a Piper voice pair from the official voices repo (HuggingFace).
+
+        Voice names look like ``en_US-lessac-medium`` which maps to
+        ``…/en/en_US/lessac/medium/en_US-lessac-medium.onnx``. Runs in a
+        worker thread; raises on any failure.
+        """
+        import urllib.request
+
+        parts = self._voice_name.split("-")
+        if len(parts) != 3:
+            raise TTSError(
+                f"Cannot derive a download URL from voice name '{self._voice_name}' "
+                "(expected e.g. en_US-lessac-medium)."
+            )
+        lang_region, name, quality = parts
+        lang = lang_region.split("_")[0].lower()
+        base = (
+            "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+            f"/{lang}/{lang_region}/{name}/{quality}"
+        )
+        self._models_dir.mkdir(parents=True, exist_ok=True)
+        for dest, url in (
+            (model_path, f"{base}/{self._voice_name}.onnx"),
+            (config_path, f"{base}/{self._voice_name}.onnx.json"),
+        ):
+            if dest.exists():
+                continue
+            logger.info("Downloading Piper voice file %s …", url)
+            req = urllib.request.Request(url, headers={"User-Agent": "jev-voice-setup"})
+            with urllib.request.urlopen(req, timeout=180) as resp, open(dest, "wb") as fh:
+                fh.write(resp.read())
+            logger.info("Saved %s", dest)
 
     async def warmup(self) -> None:
         """Load the Piper voice model without synthesizing user text."""

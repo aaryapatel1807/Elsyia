@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiBase } from "../lib/api";
 
 type PlanSummary = {
   id: string;
@@ -17,7 +18,7 @@ type PlanDetail = {
   reasoning_summary?: string;
 };
 
-const API = "http://127.0.0.1:8000/api/v1";
+const API = apiBase();
 
 export default function PlanPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [plans, setPlans] = useState<PlanSummary[]>([]);

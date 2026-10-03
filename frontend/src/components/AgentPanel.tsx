@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiBase } from "../lib/api";
 
 type Agent = {
   id: string;
@@ -12,7 +13,7 @@ type Agent = {
   last_error?: string | null;
 };
 
-const API = "http://127.0.0.1:8000/api/v1";
+const API = apiBase();
 
 export default function AgentPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [agents, setAgents] = useState<Agent[]>([]);

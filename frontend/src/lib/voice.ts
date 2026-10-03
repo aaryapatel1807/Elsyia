@@ -17,7 +17,9 @@
  * is what connects the two.
  */
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
+import { apiBase } from "./api";
+
+const API_BASE = apiBase();
 
 export class VoiceRecorder {
   private mediaRecorder: MediaRecorder | null = null;
