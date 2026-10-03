@@ -67,9 +67,19 @@
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": ["nsis", "appx"],
       "icon": "build-resources/icons/icon.ico",
       "requestedExecutionLevel": "asInvoker"
+    },
+    "appx": {
+      "identityName": "AaryaPatel.Jev",
+      "publisher": "CN=PLACEHOLDER-FROM-PARTNER-CENTER",
+      "publisherDisplayName": "Aarya Patel",
+      "applicationId": "Jev",
+      "displayName": "Jev",
+      "description": "Jev — your local voice assistant",
+      "backgroundColor": "#1a1a2e",
+      "languages": ["en-US"]
     },
     "nsis": {
       "oneClick": false,
