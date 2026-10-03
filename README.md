@@ -181,6 +181,49 @@ model file is about 1 MB.
 `libportaudio2` system package). The test suite covers the trigger wiring
 with a faked mic and model — no audio hardware needed.
 
+### Dictation mode — say it, it types
+
+Press **Ctrl+Shift+D** anywhere on your system and Jev starts recording —
+press it again and your words get typed into whichever app was focused:
+Gmail, Docs, Notion, a chat box, a terminal, anywhere. Speaking runs at
+roughly 150 words per minute against ~40 for typing, so this is the
+fastest way to get text out of your head.
+
+Before anything is typed, the raw transcript goes through an **instant
+cleanup** pass on your local Ollama model: filler words are stripped,
+punctuation and obvious mishears are fixed, and self-corrections are
+resolved to what you actually meant:
+
+> say: *"um so, uh, meet at 2... no, 3pm"*
+> get: *"Meet at 3pm."*
+
+Your language is preserved — Hinglish stays Hinglish; nothing is
+translated, and nothing is ever added.
+
+**The flow:** hotkey → red recording dot in the overlay (Esc cancels) →
+hotkey again → cleanup → a preview popup shows the cleaned text with
+**Type it / Re-record / Cancel**. Set `JEV_DICTATION_CONFIRM=false` in
+`backend/.env` to skip the preview and type immediately. The overlay
+hides itself before typing so your keystrokes land in the right app, and
+the wake-word listener pauses while you dictate so Jev can't hear itself.
+
+Dictation is a separate, silent mode: it types text and never triggers
+Jev's spoken reply loop.
+
+**Privacy:** everything is on-device — faster-whisper for transcription,
+Ollama for cleanup, pynput for typing. No audio leaves your machine and
+nothing is stored after the turn.
+
+**Windows setup:** allow microphone access for the app
+(Settings → Privacy & security → Microphone), and make sure the backend
+has `pynput` (`pip install pynput` — it is in the backend dependencies).
+If typing reports unavailable, that is the missing piece.
+
+**Customising:** the hotkey is `JEV_DICTATION_HOTKEY` in `backend/.env`
+(read by the Electron shell at launch, so set it before starting the
+app). The cleanup prompt lives in `prompts/dictation-cleanup.txt` — edit
+it to change how aggressive the cleanup is.
+
 ---
 
 ## 💻 Desktop app — install it, don't build it
