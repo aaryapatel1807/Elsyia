@@ -81,14 +81,49 @@ function createJevOverlay(): BrowserWindow {
 }
 
 /** Toggle the Jev overlay from anywhere in the OS. */
-function summonJev(): void {
+function summonJev(wake = false): void {
   const win = jevOverlay ?? createJevOverlay();
   if (win.isVisible()) {
     win.hide();
   } else {
     win.show();
     win.focus();
-    win.webContents.send("jev-summon");
+    win.webContents.send("jev-summon", { wake });
+  }
+}
+
+/**
+ * Wake-word polling: while the listener toggle is on, ask the backend
+ * twice a second whether the wake phrase was heard. A hit summons Jev
+ * exactly like the global hotkey, flagged as a hands-free wake.
+ */
+const WAKE_POLL_URL = "http://127.0.0.1:8000/api/v1/jev/wakeword/event";
+let wakePollTimer: NodeJS.Timeout | null = null;
+
+async function pollWakeWord(): Promise<void> {
+  try {
+    const res = await fetch(WAKE_POLL_URL);
+    if (!res.ok) return;
+    const data = (await res.json()) as { wake?: boolean };
+    if (data.wake) {
+      console.log("[Jev] Wake word heard — summoning");
+      summonJev(true);
+    }
+  } catch {
+    // Backend not up (yet) — stay quiet and keep polling.
+  }
+}
+
+function setWakeWordPolling(enabled: boolean): void {
+  if (wakePollTimer) {
+    clearInterval(wakePollTimer);
+    wakePollTimer = null;
+  }
+  if (enabled) {
+    console.log("[Jev] Wake-word polling started");
+    wakePollTimer = setInterval(() => void pollWakeWord(), 500);
+  } else {
+    console.log("[Jev] Wake-word polling stopped");
   }
 }
 
@@ -110,9 +145,17 @@ app.whenReady().then(() => {
   ipcMain.on("jev-hide-overlay", () => {
     jevOverlay?.hide();
   });
+
+  ipcMain.on("jev-wakeword-polling", (_event, enabled: boolean) => {
+    setWakeWordPolling(enabled === true);
+  });
 });
 
 app.on("will-quit", () => {
+  if (wakePollTimer) {
+    clearInterval(wakePollTimer);
+    wakePollTimer = null;
+  }
   globalShortcut.unregisterAll();
 });
 

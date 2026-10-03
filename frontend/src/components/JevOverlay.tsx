@@ -9,8 +9,9 @@ declare global {
   interface Window {
     elysia?: {
       version: string;
-      onJevSummon?: (cb: () => void) => () => void;
+      onJevSummon?: (cb: (info?: { wake: boolean }) => void) => () => void;
       hideJevOverlay?: () => void;
+      setWakeWordPolling?: (enabled: boolean) => void;
     };
   }
 }
@@ -68,6 +69,10 @@ export default function JevOverlay() {
   const [timings, setTimings] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<JevAction | null>(null);
+  const [wakeOn, setWakeOn] = useState(false);
+  const [wakeModel, setWakeModel] = useState("hey jarvis");
+  const [wakeAvailable, setWakeAvailable] = useState(true);
+  const wakeTurnRef = useRef(false);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const audioQueueRef = useRef<AudioQueue | null>(null);
@@ -81,16 +86,56 @@ export default function JevOverlay() {
     setStatus("idle");
   }, []);
 
+  /** Soft two-tone chime played when the wake word summons Jev. */
+  const playWakeChime = useCallback(() => {
+    try {
+      const Ctx =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      [880, 1318.5].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const t0 = now + i * 0.13;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.34);
+      });
+      window.setTimeout(() => void ctx.close(), 700);
+    } catch {
+      // Audio unavailable — the summon still works, just silently.
+    }
+  }, []);
+
+  /** A wake-initiated turn finished: the listener goes back to sleep-watch. */
+  const endWakeTurn = useCallback(() => {
+    if (!wakeTurnRef.current) return;
+    wakeTurnRef.current = false;
+    fetch(`${API_BASE}/jev/wakeword/resume`, { method: "POST" }).catch(() => {});
+  }, []);
+
   const speakReply = useCallback(
     (text: string) => {
       const sentences = splitSentences(text);
       if (sentences.length === 0) {
+        endWakeTurn();
         setStatus("idle");
         return;
       }
       setStatus("speaking");
       const queue = new AudioQueue();
-      queue.onComplete = () => setStatus("idle");
+      queue.onComplete = () => {
+        endWakeTurn();
+        setStatus("idle");
+      };
       audioQueueRef.current = queue;
       // Fire all TTS requests at once; the queue plays them in order,
       // so the first sentence starts speaking ASAP (perceived latency win).
@@ -100,7 +145,7 @@ export default function JevOverlay() {
           .catch((err) => console.error("TTS failed for chunk:", err));
       });
     },
-    []
+    [endWakeTurn]
   );
 
   const runTurn = useCallback(
@@ -127,16 +172,18 @@ export default function JevOverlay() {
         setPendingConfirm(needsConfirm ?? null);
         if (!turn.transcript.trim()) {
           setError("Didn't catch that — hold a little longer");
+          endWakeTurn();
           setStatus("idle");
           return;
         }
         speakReply(turn.reply);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Voice loop failed.");
+        endWakeTurn();
         setStatus("idle");
       }
     },
-    [speakReply]
+    [speakReply, endWakeTurn]
   );
 
   const stopListeningAndRespond = useCallback(async () => {
@@ -152,9 +199,10 @@ export default function JevOverlay() {
       await runTurn(audioBlob, []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Microphone failed.");
+      endWakeTurn();
       setStatus("idle");
     }
-  }, [runTurn]);
+  }, [runTurn, endWakeTurn]);
 
   const startListening = useCallback(async () => {
     if (recorderRef.current) return;
@@ -203,8 +251,15 @@ export default function JevOverlay() {
   }, [pendingConfirm, speakReply]);
 
   // Global hotkey summons us from the main process; Space is PTT inside.
+  // A wake-word summon arrives with { wake: true }: chime, then listen hands-free.
   useEffect(() => {
-    const off = window.elysia?.onJevSummon?.(() => void startListening());
+    const off = window.elysia?.onJevSummon?.((info) => {
+      if (info?.wake) {
+        wakeTurnRef.current = true;
+        playWakeChime();
+      }
+      void startListening();
+    });
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Space") {
         e.preventDefault();
@@ -225,7 +280,51 @@ export default function JevOverlay() {
       off?.();
       window.removeEventListener("keydown", onKey);
     };
-  }, [startListening, stopListeningAndRespond, stopAll, status]);
+  }, [startListening, stopListeningAndRespond, stopAll, status, playWakeChime]);
+
+  // Wake-word toggle: explicit opt-in for the always-on listener.
+  useEffect(() => {
+    fetch(`${API_BASE}/jev/wakeword/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s: { enabled?: boolean; model?: string; available?: boolean } | null) => {
+        if (!s) return;
+        setWakeOn(!!s.enabled);
+        if (s.model) setWakeModel(String(s.model).replace(/_/g, " "));
+        setWakeAvailable(s.available !== false);
+        window.elysia?.setWakeWordPolling?.(!!s.enabled);
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleWakeWord = useCallback(async () => {
+    const next = !wakeOn;
+    try {
+      const res = await fetch(
+        `${API_BASE}/jev/wakeword/${next ? "enable" : "disable"}`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(
+          typeof body.detail === "string"
+            ? body.detail
+            : "Wake-word listener unavailable on this machine."
+        );
+        return;
+      }
+      const s = (await res.json()) as {
+        enabled?: boolean;
+        model?: string;
+        available?: boolean;
+      };
+      setWakeOn(!!s.enabled);
+      if (s.model) setWakeModel(String(s.model).replace(/_/g, " "));
+      setWakeAvailable(s.available !== false);
+      window.elysia?.setWakeWordPolling?.(!!s.enabled);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Wake-word toggle failed.");
+    }
+  }, [wakeOn]);
 
   const totalMs = timings.total_ms;
   const orbClass =
@@ -283,6 +382,12 @@ export default function JevOverlay() {
         .jev-confirm-yes { background: #2fbf71; color: #06130c; }
         .jev-confirm-no { background: rgba(255,255,255,0.1); color: #f2f2f5; }
         .jev-hint { margin-top: 10px; font-size: 11px; color: #6d6d85; }
+        .jev-wake { width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+          background: rgba(120,140,255,0.07); border: 1px solid rgba(120,140,255,0.18);
+          box-sizing: border-box; -webkit-app-region: no-drag; }
+        .jev-wake-label { display: flex; align-items: center; gap: 10px; font-size: 12px;
+          color: #b9c6ff; cursor: pointer; letter-spacing: 0.04em; }
+        .jev-wake-warn { margin-top: 6px; font-size: 11px; color: #ff9d9d; }
       `}</style>
 
       <div className="jev-title">JEV</div>
@@ -342,6 +447,20 @@ export default function JevOverlay() {
           {status === "listening" ? "Release to send" : "Hold to talk to Jev"}
         </button>
       )}
+      <div className="jev-wake">
+        <label className="jev-wake-label">
+          <input
+            type="checkbox"
+            checked={wakeOn}
+            onChange={() => void toggleWakeWord()}
+            aria-label="Wake word listener"
+          />
+          <span>Wake word · “{wakeModel}”</span>
+        </label>
+        {!wakeAvailable && (
+          <div className="jev-wake-warn">listener unavailable on this machine</div>
+        )}
+      </div>
       <div className="jev-hint">Ctrl+Shift+J anywhere to summon · Esc to dismiss</div>
     </div>
   );
