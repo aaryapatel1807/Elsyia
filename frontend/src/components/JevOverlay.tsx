@@ -61,6 +61,54 @@ function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
+/** One agent-mode step as the backend reports it. */
+interface AgentStepState {
+  seq: number;
+  tool: string;
+  say: string;
+  status: string;
+  confirmation_message?: string | null;
+  error?: string | null;
+}
+
+function toAgentStepState(s: any): AgentStepState {
+  return {
+    seq: s.seq,
+    tool: s.tool,
+    say: s.say,
+    status: s.status,
+    confirmation_message: s.confirmation_message ?? null,
+    error: s.error ?? null,
+  };
+}
+
+/** Read a POST SSE stream (EventSource can't POST), dispatching each event. */
+async function readAgentStream(
+  res: Response,
+  onEvent: (e: any) => void
+): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("Streaming not supported in this browser.");
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const chunks = buf.split("\n\n");
+    buf = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const line = chunk.split("\n").find((l) => l.startsWith("data:"));
+      if (!line) continue;
+      try {
+        onEvent(JSON.parse(line.slice(5).trim()));
+      } catch {
+        /* keep the stream alive on a malformed event */
+      }
+    }
+  }
+}
+
 /**
  * Jev's summon overlay: the always-available voice interface.
  * Toggled from anywhere with Ctrl+Shift+J. One tight loop —
@@ -95,6 +143,17 @@ export default function JevOverlay() {
   const dictateRecorderRef = useRef<VoiceRecorder | null>(null);
   const dictateAutoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dictateConfirmRef = useRef(true);
+
+  // --- Agent mode ("say it and it's done" multi-step chaining). ---
+  const [agentMode, setAgentMode] = useState(false);
+  const [agentInput, setAgentInput] = useState("");
+  const [agentSteps, setAgentSteps] = useState<AgentStepState[]>([]);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentPending, setAgentPending] = useState<{
+    planId: string;
+    tool: string;
+    message: string;
+  } | null>(null);
 
   const stopAll = useCallback(() => {
     audioQueueRef.current?.stop();
@@ -405,6 +464,129 @@ export default function JevOverlay() {
     }
   }, [pendingConfirm, speakReply]);
 
+  const applyAgentStep = useCallback((incoming: AgentStepState) => {
+    setAgentSteps((prev) => {
+      const idx = prev.findIndex((s) => s.seq === incoming.seq);
+      if (idx === -1) return [...prev, incoming].sort((a, b) => a.seq - b.seq);
+      const next = [...prev];
+      next[idx] = incoming;
+      return next;
+    });
+  }, []);
+
+  const handleAgentEvent = useCallback(
+    (e: any) => {
+      switch (e.type) {
+        case "plan_created":
+          setAgentSteps(((e.plan?.steps ?? []) as any[]).map(toAgentStepState));
+          break;
+        case "step_started":
+          applyAgentStep({
+            seq: e.seq,
+            tool: e.tool,
+            say: e.say,
+            status: "running",
+          });
+          break;
+        case "step_completed":
+        case "step_failed":
+        case "step_awaiting_confirmation":
+          applyAgentStep(toAgentStepState(e.step));
+          break;
+        case "awaiting_confirmation": {
+          const steps = ((e.plan?.steps ?? []) as any[]).map(toAgentStepState);
+          setAgentSteps(steps);
+          const pending = steps.find((s) => s.status === "awaiting_confirmation");
+          if (pending) {
+            setAgentPending({
+              planId: e.plan.plan_id,
+              tool: pending.tool,
+              message:
+                pending.confirmation_message ?? "This step needs your approval.",
+            });
+          }
+          break;
+        }
+        case "plan_completed":
+        case "plan_failed":
+          setAgentSteps(((e.plan?.steps ?? []) as any[]).map(toAgentStepState));
+          setReply(e.reply ?? "");
+          speakReply(e.reply ?? "Done.");
+          setAgentPending(null);
+          break;
+        case "no_plan":
+          setReply(e.reply ?? "");
+          speakReply(e.reply ?? "Done.");
+          break;
+        default:
+          break;
+      }
+    },
+    [applyAgentStep, speakReply]
+  );
+
+  const runAgent = useCallback(async () => {
+    const message = agentInput.trim();
+    if (!message || agentBusy) return;
+    stopAll();
+    setError(null);
+    setReply("");
+    setTranscript("");
+    setActions([]);
+    setAgentSteps([]);
+    setAgentPending(null);
+    setAgentBusy(true);
+    setStatus("thinking");
+    try {
+      const res = await fetch(`${API_BASE}/jev/agent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, stream: true }),
+      });
+      if (!res.ok) throw new Error(`Agent run failed: ${res.status}`);
+      await readAgentStream(res, handleAgentEvent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Agent run failed.");
+    } finally {
+      setAgentBusy(false);
+      setStatus("idle");
+    }
+  }, [agentInput, agentBusy, stopAll, handleAgentEvent]);
+
+  const confirmAgentRun = useCallback(async () => {
+    if (!agentPending) return;
+    const { planId, tool } = agentPending;
+    setAgentPending(null);
+    setStatus("thinking");
+    try {
+      const res = await fetch(`${API_BASE}/jev/agent/${planId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmed: [tool], stream: true }),
+      });
+      if (!res.ok) throw new Error(`Confirm failed: ${res.status}`);
+      await readAgentStream(res, handleAgentEvent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Confirm failed.");
+    } finally {
+      setStatus("idle");
+    }
+  }, [agentPending, handleAgentEvent]);
+
+  const denyAgentRun = useCallback(async () => {
+    if (!agentPending) return;
+    try {
+      await fetch(`${API_BASE}/jev/agent/${agentPending.planId}/cancel`, {
+        method: "POST",
+      });
+    } catch {
+      /* best effort — the plan simply stays paused and expires */
+    }
+    setAgentPending(null);
+    setReply("Understood — I won't do that.");
+    speakReply("Understood — I won't do that.");
+  }, [agentPending, speakReply]);
+
   // Global hotkey summons us from the main process; Space is PTT inside.
   // A wake-word summon arrives with { wake: true }: chime, then listen hands-free.
   // A dictation summon arrives with { dictate: true }: toggle record/stop/type.
@@ -594,6 +776,21 @@ export default function JevOverlay() {
         .jev-wake-label { display: flex; align-items: center; gap: 10px; font-size: 12px;
           color: #b9c6ff; cursor: pointer; letter-spacing: 0.04em; }
         .jev-wake-warn { margin-top: 6px; font-size: 11px; color: #ff9d9d; }
+        .jev-agent { width: 100%; margin-top: 12px; -webkit-app-region: no-drag; }
+        .jev-agent-toggle { background: none; border: none; color: #8b8ba3;
+          font-size: 12px; letter-spacing: 0.06em; cursor: pointer; padding: 4px 0; }
+        .jev-agent-panel { margin-top: 8px; padding: 12px; border-radius: 12px;
+          background: rgba(120,140,255,0.07); border: 1px solid rgba(120,140,255,0.18);
+          box-sizing: border-box; }
+        .jev-agent-row { display: flex; gap: 8px; }
+        .jev-agent-input { flex: 1; background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+          color: #f2f2f5; padding: 10px 12px; font-size: 13px; outline: none;
+          -webkit-app-region: no-drag; }
+        .jev-agent-run { padding: 10px 16px; border-radius: 10px; border: none;
+          font-weight: 600; cursor: pointer;
+          background: linear-gradient(135deg, #4f7cff, #8a5cff); color: white; }
+        .jev-agent-run:disabled { opacity: 0.5; cursor: default; }
       `}</style>
 
       <div className="jev-title">JEV</div>
@@ -607,6 +804,7 @@ export default function JevOverlay() {
         )}
         {dictateMode && !dictateRecording && dictateBusy && "cleaning up…"}
         {dictateMode && !dictateRecording && !dictateBusy && dictateText && "ready to type"}
+        {!dictateMode && agentMode && agentBusy && "running the plan…"}
         {!dictateMode && status === "idle" && "hold space to talk"}
         {!dictateMode && status === "listening" && "listening…"}
         {!dictateMode && status === "thinking" && "thinking…"}
@@ -706,6 +904,74 @@ export default function JevOverlay() {
         </label>
         {!wakeAvailable && (
           <div className="jev-wake-warn">listener unavailable on this machine</div>
+        )}
+      </div>
+      <div className="jev-agent">
+        <button className="jev-agent-toggle" onClick={() => setAgentMode((m) => !m)}>
+          {agentMode ? "▾ Agent mode" : "▸ Agent mode — several things at once"}
+        </button>
+        {agentMode && (
+          <div className="jev-agent-panel">
+            <div className="jev-agent-row">
+              <input
+                className="jev-agent-input"
+                value={agentInput}
+                onChange={(e) => setAgentInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void runAgent();
+                }}
+                placeholder="e.g. grab my flight info from Gmail and put it on my calendar"
+                disabled={agentBusy}
+                aria-label="Agent mode command"
+              />
+              <button
+                className="jev-agent-run"
+                onClick={() => void runAgent()}
+                disabled={agentBusy || !agentInput.trim()}
+              >
+                {agentBusy ? "…" : "Run"}
+              </button>
+            </div>
+            {agentSteps.length > 0 && (
+              <div className="jev-chips">
+                {agentSteps.map((s) => (
+                  <span key={s.seq} className="jev-chip">
+                    {s.say}{" "}
+                    {s.status === "completed"
+                      ? "✓"
+                      : s.status === "failed"
+                        ? "✗"
+                        : s.status === "awaiting_confirmation"
+                          ? "· confirm?"
+                          : s.status === "skipped"
+                            ? "· skipped"
+                            : s.status === "running"
+                              ? "…"
+                              : ""}
+                  </span>
+                ))}
+              </div>
+            )}
+            {agentPending && (
+              <>
+                <div className="jev-hint">{agentPending.message}</div>
+                <div className="jev-confirm">
+                  <button
+                    className="jev-confirm-yes"
+                    onClick={() => void confirmAgentRun()}
+                  >
+                    Yes, continue
+                  </button>
+                  <button
+                    className="jev-confirm-no"
+                    onClick={() => void denyAgentRun()}
+                  >
+                    No
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </div>
       <div className="jev-hint">
