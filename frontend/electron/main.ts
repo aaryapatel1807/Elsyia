@@ -15,6 +15,9 @@ import { getBackendUrl, startBackend, stopBackend } from "./backend-launcher.js"
 import { getSetting, setSetting } from "./app-settings.js";
 import { applyStoredLoginSetting, createTray, refreshTrayMenu, registerWakeWordControl } from "./tray.js";
 import { isOllamaReachable, showSetupWindow } from "./first-run.js";
+// [jev-dictation] Global hotkey module (say it, it types). Additive — the
+// overlay owns the record/stop/type toggle state; main only forwards presses.
+import { registerDictationHotkey } from "./dictation.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -193,6 +196,17 @@ app.whenReady().then(async () => {
   } else {
     console.log(`[Jev] Global hotkey registered: ${JEV_HOTKEY}`);
   }
+
+  // [jev-dictation] Say-it-it-types hotkey (default Ctrl+Shift+D, override
+  // with JEV_DICTATION_HOTKEY). Forwards to the overlay, which toggles
+  // recording -> stop/process -> preview -> type into the focused app.
+  registerDictationHotkey({
+    onToggle: () => {
+      const win = jevOverlay ?? createJevOverlay();
+      if (!win.isVisible()) win.show();
+      win.webContents.send("jev-summon", { wake: false, dictate: true });
+    },
+  });
 
   ipcMain.on("jev-hide-overlay", () => {
     jevOverlay?.hide();

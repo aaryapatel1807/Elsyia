@@ -7,6 +7,8 @@ import { contextBridge, ipcRenderer } from "electron";
 export interface JevSummonInfo {
   /** True when the summon came from the wake-word listener (hands-free). */
   wake: boolean;
+  /** [jev-dictation] True when the summon toggles dictation mode (record/type). */
+  dictate?: boolean;
 }
 
 contextBridge.exposeInMainWorld("elysia", {

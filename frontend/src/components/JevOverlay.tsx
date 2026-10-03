@@ -5,12 +5,14 @@ import { apiBase } from "../lib/api";
 
 const API_BASE = apiBase();
 const MAX_RECORDING_MS = 15000;
+/** Dictation can run longer than an assistant turn — two minutes of speech. */
+const MAX_DICTATION_MS = 120000;
 
 declare global {
   interface Window {
     elysia?: {
       version: string;
-      onJevSummon?: (cb: (info?: { wake: boolean }) => void) => () => void;
+      onJevSummon?: (cb: (info?: { wake: boolean; dictate?: boolean }) => void) => () => void;
       hideJevOverlay?: () => void;
       setWakeWordPolling?: (enabled: boolean) => void;
       /** Fired when the wake-word switch changes elsewhere (e.g. tray menu). */
@@ -83,6 +85,17 @@ export default function JevOverlay() {
   const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTranscriptRef = useRef("");
 
+  // --- Dictation mode (say it, it types): a separate, silent mode. ---
+  const [dictateMode, setDictateMode] = useState(false);
+  const [dictateText, setDictateText] = useState("");
+  const [dictateBusy, setDictateBusy] = useState(false);
+  const [dictateConfirm, setDictateConfirm] = useState(true);
+  const [dictateAvailable, setDictateAvailable] = useState(true);
+  const [dictateRecording, setDictateRecording] = useState(false);
+  const dictateRecorderRef = useRef<VoiceRecorder | null>(null);
+  const dictateAutoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dictateConfirmRef = useRef(true);
+
   const stopAll = useCallback(() => {
     audioQueueRef.current?.stop();
     audioQueueRef.current = null;
@@ -124,6 +137,145 @@ export default function JevOverlay() {
     wakeTurnRef.current = false;
     fetch(`${API_BASE}/jev/wakeword/resume`, { method: "POST" }).catch(() => {});
   }, []);
+
+  /** --- Dictation mode: say it, it types. Silent — Jev never speaks here. --- */
+
+  const pauseWakeForDictation = useCallback(() => {
+    fetch(`${API_BASE}/jev/wakeword/pause`, { method: "POST" }).catch(() => {});
+  }, []);
+
+  const resumeWakeAfterDictation = useCallback(() => {
+    fetch(`${API_BASE}/jev/wakeword/resume`, { method: "POST" }).catch(() => {});
+  }, []);
+
+  const resetDictation = useCallback(() => {
+    dictateRecorderRef.current = null;
+    if (dictateAutoStopRef.current) {
+      clearTimeout(dictateAutoStopRef.current);
+      dictateAutoStopRef.current = null;
+    }
+    setDictateMode(false);
+    setDictateRecording(false);
+    setDictateText("");
+    setDictateBusy(false);
+    setStatus("idle");
+  }, []);
+
+  const cancelDictation = useCallback(() => {
+    // Discard the recording — nothing is sent, nothing is typed.
+    const rec = dictateRecorderRef.current;
+    dictateRecorderRef.current = null;
+    if (rec) void rec.stop().catch(() => {});
+    resetDictation();
+    resumeWakeAfterDictation();
+    window.elysia?.hideJevOverlay?.();
+  }, [resetDictation, resumeWakeAfterDictation]);
+
+  const typeDictation = useCallback(
+    async (text: string) => {
+      const clean = text.trim();
+      if (!clean) {
+        cancelDictation();
+        return;
+      }
+      setDictateBusy(true);
+      try {
+        // Hide FIRST so OS focus returns to the target app, then type into it.
+        window.elysia?.hideJevOverlay?.();
+        await new Promise((r) => setTimeout(r, 250));
+        const res = await fetch(`${API_BASE}/jev/dictate/type`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: clean }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            typeof body.detail === "string" ? body.detail : `Type failed: ${res.status}`
+          );
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Typing failed.");
+      } finally {
+        setDictateBusy(false);
+        resetDictation();
+        resumeWakeAfterDictation();
+      }
+    },
+    [cancelDictation, resetDictation, resumeWakeAfterDictation]
+  );
+
+  const finishDictation = useCallback(async () => {
+    const recorder = dictateRecorderRef.current;
+    if (!recorder) return;
+    dictateRecorderRef.current = null;
+    setDictateRecording(false);
+    if (dictateAutoStopRef.current) {
+      clearTimeout(dictateAutoStopRef.current);
+      dictateAutoStopRef.current = null;
+    }
+    setDictateBusy(true);
+    setStatus("thinking");
+    try {
+      const audioBlob = await recorder.stop();
+      const form = new FormData();
+      form.append("audio", audioBlob, "dictate.webm");
+      const res = await fetch(`${API_BASE}/jev/dictate`, { method: "POST", body: form });
+      if (!res.ok) throw new Error(`Dictation failed: ${res.status}`);
+      const data = (await res.json()) as { transcript?: string; cleaned?: string };
+      const cleaned = (data.cleaned ?? "").trim();
+      if (!cleaned) {
+        setError("Didn't catch that — press the hotkey to try again");
+        resetDictation();
+        resumeWakeAfterDictation();
+        return;
+      }
+      setDictateText(cleaned);
+      if (!dictateConfirmRef.current) {
+        await typeDictation(cleaned);
+      }
+      // Otherwise stay in dictateMode showing the preview; hotkey confirms.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Dictation failed.");
+      resetDictation();
+      resumeWakeAfterDictation();
+    } finally {
+      setDictateBusy(false);
+    }
+  }, [typeDictation, resetDictation, resumeWakeAfterDictation]);
+
+  const startDictation = useCallback(async () => {
+    if (dictateRecorderRef.current) return;
+    stopAll();
+    setError(null);
+    setDictateText("");
+    pauseWakeForDictation();
+    try {
+      const recorder = new VoiceRecorder();
+      await recorder.start();
+      dictateRecorderRef.current = recorder;
+      setDictateMode(true);
+      setDictateRecording(true);
+      setStatus("listening");
+      dictateAutoStopRef.current = setTimeout(() => {
+        void finishDictation();
+      }, MAX_DICTATION_MS);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Microphone access failed.");
+      resetDictation();
+      resumeWakeAfterDictation();
+    }
+  }, [stopAll, pauseWakeForDictation, resetDictation, resumeWakeAfterDictation, finishDictation]);
+
+  const toggleDictation = useCallback(() => {
+    if (dictateRecorderRef.current) {
+      void finishDictation(); // recording -> stop & process
+    } else if (dictateMode && dictateText && !dictateBusy) {
+      void typeDictation(dictateText); // preview -> hotkey means "type it"
+    } else if (!dictateMode) {
+      void startDictation();
+    }
+  }, [dictateMode, dictateText, dictateBusy, finishDictation, typeDictation, startDictation]);
 
   const speakReply = useCallback(
     (text: string) => {
@@ -255,8 +407,13 @@ export default function JevOverlay() {
 
   // Global hotkey summons us from the main process; Space is PTT inside.
   // A wake-word summon arrives with { wake: true }: chime, then listen hands-free.
+  // A dictation summon arrives with { dictate: true }: toggle record/stop/type.
   useEffect(() => {
     const off = window.elysia?.onJevSummon?.((info) => {
+      if (info?.dictate) {
+        toggleDictation();
+        return;
+      }
       if (info?.wake) {
         wakeTurnRef.current = true;
         playWakeChime();
@@ -264,13 +421,18 @@ export default function JevOverlay() {
       void startListening();
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
+      if (e.code === "Space" && !dictateMode) {
         e.preventDefault();
         if (!e.repeat && status === "idle") void startListening();
         if (!e.repeat && status === "listening") void stopListeningAndRespond();
       }
       if (e.code === "Escape") {
         e.preventDefault();
+        // Esc mid-dictation always cancels the whole dictation turn.
+        if (dictateMode) {
+          cancelDictation();
+          return;
+        }
         if (status === "listening") void stopListeningAndRespond();
         else {
           stopAll();
@@ -283,7 +445,16 @@ export default function JevOverlay() {
       off?.();
       window.removeEventListener("keydown", onKey);
     };
-  }, [startListening, stopListeningAndRespond, stopAll, status, playWakeChime]);
+  }, [
+    startListening,
+    stopListeningAndRespond,
+    stopAll,
+    status,
+    playWakeChime,
+    dictateMode,
+    toggleDictation,
+    cancelDictation,
+  ]);
 
   // Wake-word toggle: explicit opt-in for the always-on listener.
   useEffect(() => {
@@ -300,6 +471,22 @@ export default function JevOverlay() {
     // Stay in sync when the switch is flipped from the tray menu.
     const off = window.elysia?.onWakeWordState?.((on: boolean) => setWakeOn(on));
     return () => off?.();
+  }, []);
+
+  // Dictation capability: confirm-preview setting + whether typing works here.
+  useEffect(() => {
+    fetch(`${API_BASE}/jev/dictation/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (s: { confirm?: boolean; typing_available?: boolean } | null) => {
+          if (!s) return;
+          const confirm = s.confirm !== false;
+          setDictateConfirm(confirm);
+          dictateConfirmRef.current = confirm;
+          setDictateAvailable(s.typing_available !== false);
+        }
+      )
+      .catch(() => {});
   }, []);
 
   const toggleWakeWord = useCallback(async () => {
@@ -388,6 +575,19 @@ export default function JevOverlay() {
         .jev-confirm-yes { background: #2fbf71; color: #06130c; }
         .jev-confirm-no { background: rgba(255,255,255,0.1); color: #f2f2f5; }
         .jev-hint { margin-top: 10px; font-size: 11px; color: #6d6d85; }
+        .jev-rec { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+          background: #ff5d5d; margin-right: 8px;
+          box-shadow: 0 0 12px rgba(255,93,93,0.8);
+          animation: jev-pulse 1s ease-in-out infinite; }
+        .jev-ptt-rec { background: linear-gradient(135deg, #e05252, #b03030); }
+        .jev-dictate-preview { width: 100%; margin-top: 14px; padding: 14px;
+          border-radius: 16px; background: rgba(120,140,255,0.08);
+          border: 1px solid rgba(120,140,255,0.25); box-sizing: border-box;
+          -webkit-app-region: no-drag; }
+        .jev-dictate-label { font-size: 11px; letter-spacing: 0.22em; color: #8b8ba3;
+          text-transform: uppercase; margin-bottom: 8px; }
+        .jev-dictate-text { font-size: 15px; line-height: 1.55; color: #f2f2f5;
+          max-height: 150px; overflow-y: auto; margin-bottom: 4px; }
         .jev-wake { width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
           background: rgba(120,140,255,0.07); border: 1px solid rgba(120,140,255,0.18);
           box-sizing: border-box; -webkit-app-region: no-drag; }
@@ -399,10 +599,18 @@ export default function JevOverlay() {
       <div className="jev-title">JEV</div>
       <div className={`jev-orb ${orbClass}`} />
       <div className="jev-status">
-        {status === "idle" && "hold space to talk"}
-        {status === "listening" && "listening…"}
-        {status === "thinking" && "thinking…"}
-        {status === "speaking" && "speaking…"}
+        {dictateMode && dictateRecording && (
+          <span>
+            <span className="jev-rec" />
+            dictating — hotkey to finish · Esc cancels
+          </span>
+        )}
+        {dictateMode && !dictateRecording && dictateBusy && "cleaning up…"}
+        {dictateMode && !dictateRecording && !dictateBusy && dictateText && "ready to type"}
+        {!dictateMode && status === "idle" && "hold space to talk"}
+        {!dictateMode && status === "listening" && "listening…"}
+        {!dictateMode && status === "thinking" && "thinking…"}
+        {!dictateMode && status === "speaking" && "speaking…"}
       </div>
 
       <div className="jev-text">
@@ -425,7 +633,40 @@ export default function JevOverlay() {
         {error && <div className="jev-error">{error}</div>}
       </div>
 
-      {pendingConfirm ? (
+      {dictateMode ? (
+        <>
+          {dictateText && !dictateRecording && !dictateBusy && (
+            <div className="jev-dictate-preview">
+              <div className="jev-dictate-label">cleaned & ready to type</div>
+              <div className="jev-dictate-text">{dictateText}</div>
+              <div className="jev-confirm">
+                <button
+                  className="jev-confirm-yes"
+                  onClick={() => void typeDictation(dictateText)}
+                >
+                  Type it
+                </button>
+                <button className="jev-confirm-no" onClick={() => void startDictation()}>
+                  Re-record
+                </button>
+                <button className="jev-confirm-no" onClick={() => void cancelDictation()}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {dictateRecording && (
+            <button className="jev-ptt jev-ptt-rec" onClick={() => void finishDictation()}>
+              Stop & clean up
+            </button>
+          )}
+          {!dictateAvailable && (
+            <div className="jev-wake-warn">
+              typing needs the pynput package on the backend
+            </div>
+          )}
+        </>
+      ) : pendingConfirm ? (
         <div className="jev-confirm">
           <button className="jev-confirm-yes" onClick={() => void confirmAction()}>
             Yes, do it
@@ -467,7 +708,9 @@ export default function JevOverlay() {
           <div className="jev-wake-warn">listener unavailable on this machine</div>
         )}
       </div>
-      <div className="jev-hint">Ctrl+Shift+J anywhere to summon · Esc to dismiss</div>
+      <div className="jev-hint">
+        Ctrl+Shift+J summon · Ctrl+Shift+D dictate · Esc dismiss
+      </div>
     </div>
   );
 }
