@@ -759,6 +759,16 @@ class Settings(BaseSettings):
         description="Quiet period after a wake event so Jev's own reply can't re-trigger",
     )
 
+    # === Jev dictation mode (say it, it types) ===
+    JEV_DICTATION_HOTKEY: str = Field(
+        default="CommandOrControl+Shift+D",
+        description="Global hotkey toggling dictation mode (read by the Electron shell at launch)",
+    )
+    JEV_DICTATION_CONFIRM: bool = Field(
+        default=True,
+        description="Show the cleaned-text preview (Type it / Re-record / Cancel) before typing",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

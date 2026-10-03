@@ -35,6 +35,8 @@ dependencies = [
     # Jev wake word: on-device keyword spotting (openWakeWord) + mic capture
     "openwakeword>=0.6.0",
     "sounddevice>=0.4.6",
+    # Jev dictation mode: type into the focused app (pynput keyboard injection)
+    "pynput>=1.7.7",
 ]
 
 [project.optional-dependencies]

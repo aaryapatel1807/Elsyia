@@ -240,3 +240,79 @@ async def calendar_status() -> dict[str, bool]:
 async def calendar_today() -> dict[str, Any]:
     events = await CalendarClient().today()
     return {"events": events, "count": len(events)}
+
+
+# --- Dictation mode (say it, it types) ---
+
+
+class DictateResponse(BaseModel):
+    transcript: str
+    cleaned: str
+    timings_ms: dict[str, float]
+
+
+class DictateCleanupRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+
+
+class DictateTypeRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=20000)
+
+
+@router.post("/dictate", response_model=DictateResponse)
+async def jev_dictate(audio: UploadFile = File(...)):
+    """One dictation pass: mic audio -> transcript -> cleaned text.
+
+    Stays silent — this never triggers Jev's spoken reply loop. The caller
+    pauses the wake-word listener while dictating.
+    """
+    import time as _time
+
+    from app.services.jev.dictation import cleanup_transcript
+
+    data = await audio.read()
+    timings: dict[str, float] = {}
+    t0 = _time.perf_counter()
+    settings = get_settings()
+    stt = get_stt_provider(settings.DEFAULT_STT_PROVIDER)
+    transcript = await stt.transcribe(data)
+    timings["stt_ms"] = (_time.perf_counter() - t0) * 1000
+    t1 = _time.perf_counter()
+    cleaned = await cleanup_transcript(transcript, settings)
+    timings["cleanup_ms"] = (_time.perf_counter() - t1) * 1000
+    timings["total_ms"] = (_time.perf_counter() - t0) * 1000
+    logger.info(f"Dictation: {len(transcript)} chars transcribed, {len(cleaned)} cleaned")
+    return DictateResponse(transcript=transcript, cleaned=cleaned, timings_ms=timings)
+
+
+@router.post("/dictate/cleanup")
+async def jev_dictate_cleanup(request: DictateCleanupRequest) -> dict[str, str]:
+    """Run just the Ollama cleanup pass over already-known text."""
+    from app.services.jev.dictation import cleanup_transcript
+
+    return {"cleaned": await cleanup_transcript(request.text)}
+
+
+@router.post("/dictate/type")
+async def jev_dictate_type(request: DictateTypeRequest) -> dict[str, Any]:
+    """Type text into the currently focused application (pynput).
+
+    The caller hides the overlay first so focus is back in the target app.
+    """
+    from app.services.jev.dictation import DictationUnavailable, type_text_async
+
+    try:
+        chars = await type_text_async(request.text)
+    except DictationUnavailable as exc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=503, detail=str(exc))
+    return {"typed_chars": chars}
+
+
+@router.get("/dictation/status")
+async def jev_dictation_status() -> dict[str, Any]:
+    """Dictation capability report: hotkey, confirm setting, typing support."""
+    from app.services.jev.dictation import dictation_status
+
+    return dictation_status()
