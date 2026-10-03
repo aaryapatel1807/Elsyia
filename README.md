@@ -276,6 +276,52 @@ prompt lives in `prompts/agent-planner.txt`.
 
 ---
 
+### Screen-aware mode — circle anything, then just ask
+
+Press **Ctrl+Shift+S**. Your screen dims; drag a rectangle around
+whatever has your attention — an error message, a maths problem, a
+paragraph you're stuck on. Release, and Jev shows you the capture and
+asks: *"What about it?"* Ask by typing, or hold the mic button (or
+just press Space) and ask by voice:
+
+> "what's this error?" · "solve 2x+7=15" · "reply to this email here"
+
+Jev looks at the region with a small local vision model (**moondream**,
+running on your machine through Ollama — nothing leaves your laptop),
+answers in text and out loud, and shows you the capture it worked
+from. If the answer leads somewhere actionable, tap **Do it with agent
+mode**: your question is handed to the agent-mode planner, which can
+chain the new read-only `see_capture` tool into real tools — so "reply
+to this email here" can draft and, after the usual confirmation tap,
+actually send the Gmail reply. The planner sees the capture; the
+confirm gate still applies to every outward action.
+
+**The privacy promise, plainly:** Jev only looks when you ask. The
+screen capture happens only when you press the hotkey and draw a
+region — never in the background, never continuous watching, never a
+full screenshot. The capture lives only in memory, is never written to
+disk, and expires on its own after 5 minutes (`JEV_SEE_CAPTURE_TTL_S`).
+The region-select window says it on the tin: *"Jev only looks when
+you ask."*
+
+One-time setup on your laptop:
+
+```bash
+ollama pull moondream
+```
+
+That's the only new download — about 1.7 GB, free, local. If the model
+isn't pulled yet, Jev tells you exactly which command to run instead
+of guessing.
+
+Developers: `POST /jev/see/capture` (multipart PNG; only called after
+the explicit region select), `POST /jev/see` (question → answer +
+timings), `GET /jev/see/status` (vision model availability). Settings:
+`JEV_SEE_HOTKEY` (default `CommandOrControl+Shift+S`), `JEV_SEE_MODEL`
+(default `moondream`), `JEV_SEE_CAPTURE_TTL_S` (default `300`).
+
+---
+
 ### MCP — build your own integrations
 
 The Model Context Protocol is an open standard for giving AI assistants
