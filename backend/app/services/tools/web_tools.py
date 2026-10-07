@@ -120,25 +120,89 @@ class GetWorldFinanceNewsTool(Tool):
 
 
 class FetchUrlTool(Tool):
-    """Fetches the raw text content of a URL."""
+    """Fetches a URL and extracts its readable article text."""
 
     name = "fetch_url"
-    description = "Fetch the raw text content of a given URL."
+    description = (
+        "Fetch a web page and extract its main readable text "
+        "(article extraction via trafilatura, raw-text fallback)."
+    )
 
     async def run(self, url: str, **kwargs: Any) -> str:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
-            response = await client.get(url)
+        url = (url or "").strip()
+        if not url.startswith(("http://", "https://")):
+            raise ToolError("fetch_url needs a full http(s) URL.")
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+            response = await client.get(
+                url, headers={"User-Agent": "jev-assistant/1.0"}
+            )
             response.raise_for_status()
-            return response.text[:4000]
+            html = response.text
+        try:
+            from trafilatura import extract
+
+            text = extract(
+                html, include_comments=False, include_tables=True,
+                no_fallback=False,
+            )
+            if text and len(text.strip()) > 200:
+                return text.strip()[:8000]
+        except ImportError:
+            pass
+        except Exception:  # noqa: BLE001 — fall back to raw text
+            pass
+        import re as _re
+
+        text = _re.sub(r"<script.*?</script>", " ", html, flags=_re.S | _re.I)
+        text = _re.sub(r"<style.*?</style>", " ", text, flags=_re.S | _re.I)
+        text = _re.sub(r"<[^>]+>", " ", text)
+        return " ".join(text.split())[:4000]
 
 
 class SearchWebTool(Tool):
-    """Searches the web for a query. Not yet implemented — stub, same as in FRIDAY."""
+    """Keyless web search via ddgs (metasearch, no API key needed)."""
 
     name = "search_web"
-    description = "Search the web for a given query and return a summary of results."
+    description = (
+        "Search the web for a query and return titles, URLs and snippets. "
+        "Keyless metasearch (ddgs) — no API key required."
+    )
 
-    async def run(self, query: str, **kwargs: Any) -> str:
-        # TODO: wire to a real search provider. Left as a stub deliberately —
-        # it was a stub in the FRIDAY source too, not a regression from the port.
-        raise ToolError(f"search_web is not yet implemented (query was: {query!r})")
+    # Backends tried in order; different networks block different engines.
+    _BACKENDS = ("bing", "brave", "duckduckgo", "mojeek", "google")
+
+    async def run(self, query: str, max_results: int = 5, **kwargs: Any) -> dict[str, Any]:
+        query = (query or "").strip()
+        if not query:
+            raise ToolError("search_web needs a query.")
+        try:
+            from ddgs import DDGS
+        except ImportError as exc:
+            raise ToolError(
+                "Web search needs the 'ddgs' package (pip install ddgs)."
+            ) from exc
+        max_results = max(1, min(int(max_results or 5), 10))
+        last_error: str | None = None
+        for backend in self._BACKENDS:
+            try:
+                with DDGS() as ddgs:
+                    raw = list(ddgs.text(
+                        query, max_results=max_results,
+                        backend=backend, timeout=15,
+                    ))
+                results = [
+                    {
+                        "title": r.get("title", ""),
+                        "url": r.get("href", ""),
+                        "snippet": r.get("body", ""),
+                    }
+                    for r in raw
+                    if r.get("href")
+                ]
+                if results:
+                    return {"query": query, "backend": backend, "results": results}
+                last_error = f"{backend}: no results"
+            except Exception as exc:  # noqa: BLE001 — try next backend
+                last_error = f"{backend}: {exc}"
+                continue
+        raise ToolError(f"Web search failed on all backends ({last_error}).")

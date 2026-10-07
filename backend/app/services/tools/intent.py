@@ -41,6 +41,10 @@ _SET_VOLUME_RE = re.compile(r"^(?:set\s+)?volume\s+(?:to\s+)?(\d{1,3})\s*%?$", r
 _SET_BRIGHTNESS_RE = re.compile(r"^(?:set\s+)?brightness\s+(?:to\s+)?(\d{1,3})\s*%?$", re.IGNORECASE)
 _OPEN_SETTINGS_RE = re.compile(r"^(?:open|show)\s+(.+?)\s+settings$", re.IGNORECASE)
 _SEARCH_CODE_RE = re.compile(r"^(?:search|find)\s+code\s+(?:for\s+)?(.+)$", re.IGNORECASE)
+_WEB_SEARCH_RE = re.compile(
+    r"^(?:search\s+(?:the\s+)?web\s+for|google|look\s+up|web\s+search\s+for)\s+(.+?)\s*$",
+    re.IGNORECASE,
+)
 
 # --- Jev integration patterns ---
 _YOUTUBE_RE = re.compile(r"^play\s+(.+?)\s+on\s+youtube\s*$", re.IGNORECASE)
@@ -391,6 +395,12 @@ def route_intent(message: str) -> ToolIntent | None:
     match = _SEARCH_CONTENT_RE.match(text)
     if match:
         return ToolIntent("search_local_files", {"query": _clean(match.group(1)), "mode": "content"}, 0.94)
+
+    match = _WEB_SEARCH_RE.match(text)
+    if match:
+        query = _clean(match.group(1)).strip(" .")
+        if len(query) >= 2:
+            return ToolIntent("search_web", {"query": query}, 0.93)
 
     match = _SEARCH_FILES_RE.match(text)
     if match:

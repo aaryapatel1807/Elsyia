@@ -12,8 +12,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.core import get_settings
+from app.core import get_logger, get_settings
 from app.services.tools.base import Tool, ToolError
+
+logger = get_logger("tools.reminders")
 
 
 def _utc_now() -> datetime:
@@ -139,7 +141,26 @@ class ReminderStore:
 
 
 async def deliver_reminder(reminder: dict[str, Any]) -> None:
-    """Deliver a reminder through the Windows built-in session message utility."""
+    """Deliver a reminder as a native desktop notification.
+
+    Prefers the cross-platform desktop-notifier package (native toasts on
+    Windows/macOS/Linux); falls back to Windows msg.exe when it's missing
+    or unusable. Failures raise ToolError so the worker keeps the reminder
+    pending for a later retry.
+    """
+    title = str(reminder["title"])
+    try:
+        from desktop_notifier import DesktopNotifier
+    except ImportError:
+        notifier = None
+    else:
+        notifier = DesktopNotifier(app_name="Jev")
+    if notifier is not None:
+        try:
+            await notifier.send(title="Jev reminder", message=title)
+            return
+        except Exception as exc:  # noqa: BLE001 — fall through to msg.exe
+            logger.debug("desktop-notifier delivery failed: %s", exc)
     if os.name != "nt":
         raise ToolError("Reminder notifications are currently supported on Windows only.")
     msg_path = shutil.which("msg.exe")

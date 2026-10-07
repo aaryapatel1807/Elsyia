@@ -41,6 +41,11 @@ dependencies = [
     "mcp>=1.0.0",
     # Jev ambient tools: live system stats (CPU/memory/disk)
     "psutil>=5.9.0",
+    # Jev web tools: keyless metasearch + article extraction (no API keys)
+    "ddgs>=9.0.0",
+    "trafilatura>=2.0.0",
+    # Jev reminders: native cross-platform desktop notifications
+    "desktop-notifier>=5.0.0",
 ]
 
 [project.optional-dependencies]
