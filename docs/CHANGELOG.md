@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## Overnight batch — 2026-10-08 (unreleased)
+
+Non-visual, additive backend work (UI freeze honored). All commits local.
+
+### Added
+- **Morning briefing** (`morning_briefing` tool): composes today's calendar events,
+  current weather (wttr.in, keyless), and pending reminders into one spoken
+  summary. Each source is best-effort — the briefing never dies on one failure.
+- **`search_web` is now real**: keyless metasearch via `ddgs` (MIT) with a
+  backend fallback chain (bing → brave → duckduckgo → mojeek → google) — no API
+  key needed. New intent patterns: "search the web for X", "google X", "look up X".
+- **Article extraction**: `fetch_url` now returns readable article text via
+  `trafilatura` (Apache-2.0), with raw-text fallback.
+- **Stage-2 intent routing**: command-like utterances that beat the regex + fuzzy
+  matchers get one local-LLM classification (temperature 0), validated against
+  the real tool registry. LLM proposes, deterministic systems dispose.
+- **`ask_user` mid-plan input**: agent plans can ask Aarya a clarifying question
+  mid-flow; the plan pauses (`awaiting_input`) and resumes via
+  `POST /jev/agent/{id}/confirm` with `{"user_input": "..."}` — the answer
+  threads into later steps via `{{steps.N.answer}}`.
+- **Ambient tools**: `get_weather` (keyless), `get_system_stats` (psutil),
+  `get_world_news` (keyless RSS).
+- **Memory consolidation**: post-turn extract → reconcile (mem0-style
+  ADD/UPDATE/DELETE/NOOP) → save as pending-review facts (`approved=False`),
+  behind `JEV_MEMORY_CONSOLIDATE` (default on). Fire-and-forget.
+- **Conversation compaction**: auto-summarized history with summary injection
+  into the LLM context on overflow.
+- **Agent robustness**: one strict-prompt retry on empty plans; one retry on
+  transient step exceptions (not timeouts/confirmations).
+- **Natural-language times**: "in 5 minutes", "tomorrow at 5pm", "next monday at
+  9am" for timers, reminders, and calendar events.
+- **Cross-platform notifications**: reminders deliver via `desktop-notifier`
+  (MIT) native toasts; Windows `msg.exe` kept as fallback.
+
+### Fixed
+- `embeddings.py`: `httpx.InvalidURL` escaped the best-effort except clause
+  (not a subclass of `httpx.HTTPError`/`ValueError` in this httpx version);
+  broadened to `Exception`.
+- `memory/store.py`: `search()` now persists recomputed embeddings instead of
+  recomputing them on every search.
+
+### Tests
+- 158 passing (was 106): `test_timeparse`, `test_intent_natural`,
+  `test_ambient_tools`, `test_consolidate`, `test_compaction`,
+  `test_stage2_askuser`, `test_web_tools`, `test_reminder_delivery`.
+
+---
+
 ## Phase 1 — Runtime Fixes
 
 ### Fixed
