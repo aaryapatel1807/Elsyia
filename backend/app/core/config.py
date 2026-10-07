@@ -801,6 +801,13 @@ class Settings(BaseSettings):
         description="Per-step timeout for agent-mode tool execution",
     )
 
+    # === Jev memory consolidation (background, local-only) ===
+    JEV_MEMORY_CONSOLIDATE: bool = Field(
+        default=True,
+        description="Extract durable facts from Jev turns into pending-review "
+        "memories in the background. Best-effort; never blocks a turn.",
+    )
+
     # === Jev screen-aware mode ("circle anything, then just ask") ===
     JEV_SEE_HOTKEY: str = Field(
         default="CommandOrControl+Shift+S",

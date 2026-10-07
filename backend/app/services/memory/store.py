@@ -207,6 +207,7 @@ class MemoryStore:
         query_tokens = self._tokens(query)
         query_vector = embed_for_memory(query)
         ranked: list[tuple[float, int, MemoryRecord]] = []
+        stale_updates: list[tuple[str, str, str]] = []
         for index, row in enumerate(rows):
             content = self._decode_content(row)
             record = self._row_to_record(row, content)
@@ -220,11 +221,25 @@ class MemoryStore:
                 or row["embedding_version"] != settings.MEMORY_EMBEDDING_VERSION
             ):
                 stored_vector = embed_for_memory(record.content)
+                # Persist the refreshed vector: recomputing on every search
+                # is a repeated tax, writing it back is a one-time cost.
+                stale_updates.append((
+                    json.dumps(stored_vector, separators=(",", ":")),
+                    settings.MEMORY_EMBEDDING_VERSION,
+                    row["id"],
+                ))
             semantic_score = cosine_similarity(query_vector, stored_vector)
             lexical_score = len(query_tokens & self._tokens(record.content)) / max(len(query_tokens), 1)
             combined_score = 0.8 * semantic_score + 0.2 * lexical_score
             if combined_score >= 0.30 or not query_tokens:
                 ranked.append((combined_score, -index, record))
+        if stale_updates:
+            with self._lock, self._connection_scope() as connection:
+                connection.executemany(
+                    "UPDATE memories SET embedding = ?, embedding_version = ? "
+                    "WHERE id = ?",
+                    stale_updates,
+                )
         ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return [item[2] for item in ranked[:max_results]]
 

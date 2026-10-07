@@ -76,7 +76,10 @@ def neural_embed_text(text: str) -> list[float] | None:
         embeddings = response.json().get("embeddings", [])
         if embeddings and isinstance(embeddings[0], list):
             return [float(value) for value in embeddings[0]]
-    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+    except Exception as exc:  # noqa: BLE001 — neural path is best-effort;
+        # callers fall back to local hashed embeddings. (Broad because
+        # httpx.InvalidURL does not subclass httpx.HTTPError/ValueError
+        # in this httpx version and must not escape either.)
         logger.debug("Neural embedding unavailable; using local fallback: %s", exc)
     return None
 
@@ -98,7 +101,7 @@ def prewarm_neural_embedding() -> bool:
         )
         response.raise_for_status()
         return bool(response.json().get("embeddings"))
-    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+    except Exception as exc:  # noqa: BLE001 — prewarm is best-effort; see above
         logger.warning("Neural embedding prewarm skipped: %s", exc)
         return False
 

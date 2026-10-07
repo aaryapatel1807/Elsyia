@@ -149,6 +149,25 @@ class ConversationManager:
         """
         return list(self._conversations.keys())
 
+    def compact(self, conversation_id: UUID, summary_text: str, keep_last_n: int) -> int:
+        """Fold old messages into the rolling summary, keeping the newest N.
+
+        Returns the number of messages dropped. The summary is appended to
+        any existing summary and capped so it can't grow unbounded.
+        """
+        conversation = self._conversations.get(conversation_id)
+        if conversation is None or len(conversation.messages) <= keep_last_n:
+            return 0
+        dropped = len(conversation.messages) - keep_last_n
+        conversation.messages = conversation.messages[-keep_last_n:]
+        existing = (conversation.summary + "\n") if conversation.summary else ""
+        conversation.summary = (existing + summary_text.strip()).strip()[-4000:]
+        conversation.updated_at = datetime.utcnow()
+        logger.debug(
+            "Compacted conversation %s: dropped %d messages", conversation_id, dropped
+        )
+        return dropped
+
 
 # Global singleton instance
 conversation_manager = ConversationManager()

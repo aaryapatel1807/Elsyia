@@ -102,6 +102,8 @@ _ARG_HINTS: dict[str, str] = {
     "draft_text": '{"instruction": "<what to draft>"}',
     "get_current_time": '{}',
     "get_current_date": '{}',
+    "get_weather": '{"location": "<city, optional>"}',
+    "get_system_stats": '{}',
     "see_capture": '{"question": "<what to look at in the user\'s current screen capture>"}',
     "launch_application": '{"application": "<app name>"}',
 }
@@ -373,6 +375,32 @@ class AgentRunner:
             return [step], timings, "fast_path"
         t1 = time.perf_counter()
         raw_steps = await plan_with_llm(text, settings)
+        if not raw_steps and len(text.split()) >= 3:
+            # One retry with a stricter prompt: small local models sometimes
+            # ramble instead of emitting JSON on the first attempt.
+            logger.info("Agent planner: empty plan, retrying once with strict prompt")
+            strict = load_planner_prompt() + (
+                "\nSTRICT: output ONLY the JSON object. No prose, no markdown."
+            )
+            chunks: list[str] = []
+            provider = get_llm_provider(settings.DEFAULT_LLM_PROVIDER)
+            prompt = strict.replace(
+                "{tool_manifest}", build_tool_manifest()
+            ).replace("{max_steps}", str(settings.JEV_AGENT_MAX_STEPS)).replace(
+                "{utterance}", text.strip()
+            )
+            try:
+                async for chunk in provider.generate(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=1200,
+                ):
+                    chunks.append(chunk)
+                raw_steps = _parse_plan_json(
+                    "".join(chunks).strip(), settings.JEV_AGENT_MAX_STEPS
+                )
+            except Exception as exc:  # noqa: BLE001 — retry is best-effort
+                logger.debug("Agent planner retry failed: %s", exc)
         timings["plan_ms"] = (time.perf_counter() - t1) * 1000
         steps = [
             AgentStep(seq=i + 1, tool=s["tool"], args=s["args"], say=s["say"])
@@ -416,13 +444,35 @@ class AgentRunner:
                 await emit(self._step_event("step_failed", plan, step))
                 return
             except Exception as exc:  # noqa: BLE001 — executor must not die
-                step.status = "failed"
-                step.error = f"Unexpected error: {type(exc).__name__}"
-                plan.status = "failed"
-                self._skip_rest(plan, step.seq)
-                logger.exception("Agent step %d (%s) crashed", step.seq, step.tool)
-                await emit(self._step_event("step_failed", plan, step))
-                return
+                # One immediate retry for transient failures (network blips,
+                # flaky integrations). Timeouts and tool-reported failures
+                # below are NOT retried.
+                logger.warning(
+                    "Agent step %d (%s) failed, retrying once: %s",
+                    step.seq, step.tool, exc,
+                )
+                try:
+                    await asyncio.sleep(1.0)
+                    executed = await asyncio.wait_for(
+                        registry.execute(
+                            step.tool, args,
+                            confirmed=step.tool in plan.confirmed,
+                        ),
+                        timeout=settings.JEV_AGENT_STEP_TIMEOUT_S,
+                    )
+                except Exception as retry_exc:  # noqa: BLE001
+                    step.status = "failed"
+                    step.error = (
+                        f"Unexpected error: {type(retry_exc).__name__} "
+                        f"(after 1 retry)"
+                    )
+                    plan.status = "failed"
+                    self._skip_rest(plan, step.seq)
+                    logger.exception(
+                        "Agent step %d (%s) crashed", step.seq, step.tool
+                    )
+                    await emit(self._step_event("step_failed", plan, step))
+                    return
 
             step.timing_ms = (time.perf_counter() - t0) * 1000
             if executed.status == "confirmation_required":

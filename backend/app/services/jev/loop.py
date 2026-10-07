@@ -25,6 +25,9 @@ from uuid import UUID
 from app.core import get_logger, get_settings
 from app.models import MessageRole
 from app.services.chat.conversation import ConversationManager
+from app.services.llm.factory import get_llm_provider
+from app.services.memory.consolidate import maybe_consolidate
+from app.services.memory.store import get_memory_store
 from app.services.tools.intent import route_intent
 from app.services.jev.persona import JEV_NAME, build_system_prompt
 from app.services.llm.factory import get_llm_provider
@@ -73,6 +76,22 @@ def _describe_tool_result(tool_name: str, result: Any) -> str:
         return f"It's {_format_time(result)}."
     if tool_name == "get_current_date":
         return f"Today is {_format_date(result)}."
+    if tool_name == "get_weather":
+        desc = result.get("description", "")
+        temp = result.get("temp_c", "?")
+        high = result.get("day_high_c") or result.get("high_c", "?")
+        low = result.get("low_c", "?")
+        loc = result.get("location", "")
+        return f"{loc}: {desc}, {temp}°C now, high {high}°C, low {low}°C."
+    if tool_name == "get_system_stats":
+        cpu = result.get("cpu_percent")
+        mem = result.get("memory_percent")
+        disk = result.get("disk_percent")
+        parts = []
+        parts.append(f"CPU {cpu}%" if cpu is not None else "CPU unknown")
+        parts.append(f"memory {mem}%" if mem is not None else "memory unknown")
+        parts.append(f"disk {disk}%")
+        return "System: " + ", ".join(parts) + "."
     if not isinstance(result, dict):
         return str(result)[:300]
     if tool_name == "play_youtube":
@@ -198,14 +217,56 @@ class JevLoop:
         }
         return record, _describe_tool_result(tool_name, executed.result)
 
+    _COMPACT_PROMPT = (
+        "Summarize this conversation excerpt into 3-6 terse bullet facts "
+        "(decisions, names, preferences, open items). No chit-chat, no preamble:\n\n{excerpt}"
+    )
+
+    async def _maybe_compact(self, conversation_id: UUID) -> None:
+        """Fold the oldest turns into a rolling summary when history grows long."""
+        settings = get_settings()
+        max_messages = settings.MAX_CONTEXT_MESSAGES
+        conversation = self._conversations.get_or_create(conversation_id)
+        if len(conversation.messages) <= max_messages * 2:
+            return
+        drop = conversation.messages[: -max_messages:]
+        excerpt = "\n".join(
+            f"{m.role.value}: {m.content}" for m in drop
+        )[:6000]
+        try:
+            chunks: list[str] = []
+            async for chunk in self._llm_provider().generate(
+                messages=[{
+                    "role": "user",
+                    "content": self._COMPACT_PROMPT.format(excerpt=excerpt),
+                }],
+                temperature=0.1,
+                max_tokens=400,
+            ):
+                chunks.append(chunk)
+            summary = "".join(chunks).strip()
+        except Exception as exc:  # noqa: BLE001 — compaction is best-effort
+            logger.debug("Conversation compaction skipped: %s", exc)
+            return
+        if summary:
+            self._conversations.compact(
+                conversation_id, summary, keep_last_n=max_messages
+            )
+
     async def _ask_llm(self, text: str, conversation_id: UUID) -> str:
         provider = self._llm_provider()
         history = self._conversations.get_or_create(conversation_id)
+        await self._maybe_compact(conversation_id)
         max_messages = get_settings().MAX_CONTEXT_MESSAGES
         recent = history.messages[-max_messages:]
         messages = [
             {"role": m.role.value, "content": m.content} for m in recent
         ]
+        if history.summary:
+            messages.insert(0, {
+                "role": "system",
+                "content": f"Earlier in this conversation: {history.summary}",
+            })
         messages.append({"role": "user", "content": text})
         chunks: list[str] = []
         async for chunk in provider.generate(
@@ -267,6 +328,17 @@ class JevLoop:
             conversation.conversation_id, MessageRole.ASSISTANT, reply
         )
         timings["total_ms"] = (time.perf_counter() - t_start) * 1000
+        # Background memory consolidation: durable facts from this turn go
+        # to the pending-review queue. Fire-and-forget — never blocks the turn.
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(
+                maybe_consolidate(
+                    text, reply, self._llm_provider, get_memory_store,
+                )
+            )
+        except RuntimeError:
+            pass  # no running loop (e.g. called from sync test harness)
         logger.info(
             "Jev turn: intent=%s total_ms=%.0f",
             intent_name,

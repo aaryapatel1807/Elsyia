@@ -39,6 +39,8 @@ dependencies = [
     "pynput>=1.7.7",
     # Jev MCP client: community integrations via the Model Context Protocol
     "mcp>=1.0.0",
+    # Jev ambient tools: live system stats (CPU/memory/disk)
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]

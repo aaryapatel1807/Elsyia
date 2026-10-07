@@ -114,11 +114,14 @@ class StreamChunk(BaseModel):
 
 class ConversationHistory(BaseModel):
     """Conversation history."""
-    
+
     conversation_id: UUID
     messages: list[Message]
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    # Rolling summary of compacted (dropped) older turns. Prepended to the
+    # LLM context so long conversations don't lose their thread.
+    summary: str = ""
     
     class Config:
         """Pydantic configuration."""

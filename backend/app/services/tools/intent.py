@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from app.services.tools.timeparse import parse_datetime, parse_duration, words_to_number
+
 
 @dataclass(frozen=True)
 class ToolIntent:
@@ -75,13 +77,48 @@ _CALENDAR_CREATE_RE = re.compile(
     re.IGNORECASE,
 )
 _TIMER_RE = re.compile(
-    r"^(?:set\s+)?(?:a\s+)?timer\s+for\s+(\d+)\s+minutes?(?:\s+(?:called|named)?\s*(.+))?$",
+    r"^(?:set\s+)?(?:a\s+)?timer\s+for\s+(.+?)\s*$",
+    re.IGNORECASE,
+)
+_TIMER_LABEL_RE = re.compile(
+    r"^(?P<duration>.+?)\s+(?:called|named)\s+(?P<label>.+)$", re.IGNORECASE
+)
+# Natural-language fallbacks (ISO patterns above keep priority).
+# NOTE: group(1) is GREEDY here on purpose — "remind me to check in on
+# mom in 5 minutes" must title "check in on mom", not "check".
+_REMIND_IN_NATURAL_RE = re.compile(
+    r"^remind me to\s+(.+)\s+in\s+(.+)$", re.IGNORECASE
+)
+_REMIND_AT_NATURAL_RE = re.compile(
+    r"^remind me to\s+(.+?)\s+((?:tomorrow|today)\b.*|"
+    r"(?:next\s+\w+|(?:on\s+)?(?:mon|tues?|wednes?|thurs?|fri|satur?|sun)(?:day)?s?)\b.*|"
+    r"(?:at\s+\d.*))$",
+    re.IGNORECASE,
+)
+_CALENDAR_NATURAL_RE = re.compile(
+    r"^(?:schedule|add)(?:\s+an?)?(?:\s+calendar)?(?:\s+event)?\s+(.+?)\s+"
+    r"((?:tomorrow|today)\b.*|(?:next\s+\w+\b.*)|"
+    r"(?:on\s+(?:mon|tues?|wednes?|thurs?|fri|satur?|sun)(?:day)?s?\b.*)|"
+    r"(?:at\s+\d.*))$",
     re.IGNORECASE,
 )
 _NOTE_RE = re.compile(
     r"^(?:take\s+a\s+note|note\s+down|remember)\s+(?:that\s+)?(.+)$", re.IGNORECASE
 )
 _NOTES_READ_PHRASES = {"read my notes", "read notes", "show my notes", "show notes"}
+_WEATHER_IN_RE = re.compile(
+    r"^(?:what(?:'s| is) the weather|how(?:'s| is) the weather|weather)(?:\s+in\s+(.+?)|\s+at\s+(.+?)|\s+for\s+(.+?))?\s*$",
+    re.IGNORECASE,
+)
+_WEATHER_UMBRELLA_PHRASES = {
+    "do i need an umbrella", "will it rain today", "is it going to rain",
+    "will it rain", "how hot is it", "how cold is it",
+}
+_SYSTEM_STATS_PHRASES = {
+    "system stats", "how is my computer doing", "how is my pc doing",
+    "cpu usage", "memory usage", "disk space", "how much disk space",
+    "is my computer slow",
+}
 
 
 def _route_jev_intent(text: str, phrase: str, lowered: str) -> ToolIntent | None:
@@ -160,10 +197,54 @@ def _route_jev_intent(text: str, phrase: str, lowered: str) -> ToolIntent | None
 
     match = _TIMER_RE.match(phrase)
     if match:
-        args = {"minutes": int(match.group(1))}
-        if match.group(2):
-            args["label"] = _clean(match.group(2))
-        return ToolIntent("set_timer", args, 0.97)
+        tail = match.group(1).strip()
+        label = ""
+        label_match = _TIMER_LABEL_RE.match(tail)
+        if label_match:
+            tail = label_match.group("duration").strip()
+            label = _clean(label_match.group("label"))
+        duration = parse_duration(tail)
+        if duration is not None and duration > timedelta(0):
+            minutes = max(1, -(-int(duration.total_seconds()) // 60))  # ceil
+            if minutes <= 1440:
+                args = {"minutes": minutes}
+                if label:
+                    args["label"] = label
+                return ToolIntent("set_timer", args, 0.96)
+
+    # Natural-language reminder: "remind me to stretch in five minutes",
+    # "remind me to check in on mom in 2 hours",
+    # "remind me to call mom tomorrow at 5pm". ISO patterns keep priority.
+    match = _REMIND_IN_NATURAL_RE.match(text)
+    if match:
+        delta = parse_duration(match.group(2))
+        if delta is not None and delta > timedelta(0):
+            due_at = datetime.now(timezone.utc) + delta
+            return ToolIntent(
+                "create_reminder",
+                {"title": _clean(match.group(1)), "due_at": due_at.isoformat()},
+                0.94,
+            )
+    match = _REMIND_AT_NATURAL_RE.match(text)
+    if match:
+        when = parse_datetime(match.group(2))
+        if when is not None:
+            return ToolIntent(
+                "create_reminder",
+                {"title": _clean(match.group(1)), "due_at": when.isoformat()},
+                0.94,
+            )
+
+    # Natural-language calendar event: "schedule dentist tomorrow at 9am".
+    match = _CALENDAR_NATURAL_RE.match(text)
+    if match:
+        start = parse_datetime(match.group(2))
+        if start is not None:
+            return ToolIntent(
+                "create_calendar_event",
+                {"title": _clean(match.group(1)), "start": start.isoformat()},
+                0.93,
+            )
 
     match = _NOTE_RE.match(text)
     if match:
@@ -186,6 +267,16 @@ def route_intent(message: str) -> ToolIntent | None:
 
     if lowered in {"what time is it", "what's the time", "tell me the time", "current time"}:
         return ToolIntent("get_current_time", {}, 0.99)
+
+    match = _WEATHER_IN_RE.match(phrase)
+    if match:
+        location = next((g for g in match.groups() if g), "")
+        return ToolIntent("get_weather", {"location": _clean(location)}, 0.96)
+    if phrase in _WEATHER_UMBRELLA_PHRASES:
+        return ToolIntent("get_weather", {}, 0.94)
+
+    if phrase in _SYSTEM_STATS_PHRASES:
+        return ToolIntent("get_system_stats", {}, 0.95)
 
     if lowered in {"system info", "show system info", "what computer am i using", "computer info"}:
         return ToolIntent("get_system_info", {}, 0.99)
@@ -311,4 +402,69 @@ def route_intent(message: str) -> ToolIntent | None:
         if len(instruction) >= 3:
             return ToolIntent("draft_text", {"instruction": instruction}, 0.91)
 
-    return None
+    return _fuzzy_route(lowered)
+
+
+# --- Fuzzy fallback: near-miss phrasings ---------------------------------
+# When no regex or phrase matches, score the utterance against canonical
+# command phrases by token overlap. Deliberately conservative: it only
+# fires for short command-like utterances with strong overlap, and always
+# loses to every regex above.
+
+_FUZZY_COMMANDS: tuple[tuple[str, str, dict[str, Any]], ...] = (
+    ("check my email", "check_gmail", {}),
+    ("check my inbox", "check_gmail", {}),
+    ("any new email", "check_gmail", {}),
+    ("read my unread emails", "check_gmail", {}),
+    ("what is on my calendar", "calendar_today", {}),
+    ("my schedule today", "calendar_today", {}),
+    ("check my calendar", "calendar_today", {}),
+    ("read my notes", "read_notes", {}),
+    ("show my notes", "read_notes", {}),
+    ("list my reminders", "list_reminders", {}),
+    ("show my reminders", "list_reminders", {}),
+    ("what is the time", "get_current_time", {}),
+    ("tell me the time", "get_current_time", {}),
+    ("what is the date today", "get_current_date", {}),
+    ("pause the music", "media_control", {"action": "pause"}),
+    ("resume the music", "media_control", {"action": "resume"}),
+    ("skip this song", "media_control", {"action": "next"}),
+    ("next track", "media_control", {"action": "next"}),
+    ("read my clipboard", "read_clipboard", {}),
+    ("what is on my clipboard", "read_clipboard", {}),
+    ("is the network connected", "network_status", {}),
+    ("check network status", "network_status", {}),
+    ("mute the volume", "set_system_mute", {"muted": True}),
+    ("unmute the volume", "set_system_mute", {"muted": False}),
+    ("open youtube", "play_youtube", {"query": ""}),
+    ("connect my gmail", "connect_gmail", {}),
+    ("connect my calendar", "connect_calendar", {}),
+)
+
+_STOPWORDS = frozenset({
+    "the", "a", "an", "my", "me", "please", "kindly", "just", "now",
+    "hey", "jev", "could", "would", "can", "you", "it", "is", "are",
+})
+
+
+def _fuzzy_route(lowered: str) -> ToolIntent | None:
+    """Token-overlap fallback for near-miss command phrasings."""
+    words = [w for w in re.findall(r"[a-z']+", lowered) if w not in _STOPWORDS]
+    if not words or len(words) > 12:
+        return None
+    word_set = set(words)
+    best: tuple[float, str, dict[str, Any]] | None = None
+    for phrase, tool, args in _FUZZY_COMMANDS:
+        phrase_words = [w for w in phrase.split() if w not in _STOPWORDS]
+        if not phrase_words:
+            continue
+        overlap = len(word_set & set(phrase_words)) / len(phrase_words)
+        # Require most of the canonical phrase present, in any order.
+        if overlap >= 0.75 and len(word_set & set(phrase_words)) >= 2:
+            score = overlap
+            if best is None or score > best[0]:
+                best = (score, tool, args)
+    if best is None:
+        return None
+    _, tool, args = best
+    return ToolIntent(tool, dict(args), 0.72)

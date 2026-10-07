@@ -49,6 +49,7 @@ from app.services.tools.draft_tools import DraftTextTool
 from app.services.tools.reminders import CancelReminderTool, CreateReminderTool, ListRemindersTool
 from app.services.tools.registry import ToolExecutionResult, ToolRegistry, registry
 from app.services.tools.system_tools import GetCurrentTimeTool, GetSystemInfoTool
+from app.services.tools.ambient_tools import GetSystemStatsTool, GetWeatherTool
 # Jev integrations: media/messaging/social, Gmail + Calendar (OAuth),
 # timers and notes. Imported after the registry so the jev package
 # (which references the registry submodule) cannot partially initialise.
@@ -86,6 +87,8 @@ from app.services.tools.web_tools import (
 AVAILABLE_TOOLS: list[Tool] = [
     GetCurrentTimeTool(),
     GetSystemInfoTool(),
+    GetSystemStatsTool(),
+    GetWeatherTool(),
     GetWorldNewsTool(),
     GetWorldFinanceNewsTool(),
     FetchUrlTool(),
