@@ -28,7 +28,7 @@ from app.services.chat.conversation import ConversationManager
 from app.services.llm.factory import get_llm_provider
 from app.services.memory.consolidate import maybe_consolidate
 from app.services.memory.store import get_memory_store
-from app.services.tools.intent import route_intent
+from app.services.tools.intent import looks_like_command, route_intent, route_with_llm
 from app.services.jev.persona import JEV_NAME, build_system_prompt
 from app.services.llm.factory import get_llm_provider
 from app.services.tools.registry import registry
@@ -92,6 +92,8 @@ def _describe_tool_result(tool_name: str, result: Any) -> str:
         parts.append(f"memory {mem}%" if mem is not None else "memory unknown")
         parts.append(f"disk {disk}%")
         return "System: " + ", ".join(parts) + "."
+    if tool_name == "morning_briefing":
+        return result.get("summary", "Here's your briefing.")[:600]
     if not isinstance(result, dict):
         return str(result)[:300]
     if tool_name == "play_youtube":
@@ -188,6 +190,18 @@ class JevLoop:
         self, tool_name: str, arguments: dict[str, Any], confirmed: set[str]
     ) -> tuple[dict[str, Any], str]:
         """Execute one tool. Returns (action_record, spoken_reply)."""
+        # ask_user in a single turn: just speak the question back.
+        if tool_name == "ask_user":
+            question = str(
+                (arguments or {}).get("question") or "What did you have in mind?"
+            ).strip()
+            record = {
+                "tool": tool_name,
+                "status": "ok",
+                "result": {"question": question},
+                "confirmation_required": False,
+            }
+            return record, question
         executed = await registry.execute(
             tool_name, arguments, confirmed=tool_name in confirmed
         )
@@ -298,6 +312,21 @@ class JevLoop:
         t0 = time.perf_counter()
         routed = route_intent(text)
         timings["nlu_ms"] = (time.perf_counter() - t0) * 1000
+
+        # Stage-2: command-like utterances that beat the regexes get one
+        # local-LLM classification attempt, validated against the registry.
+        if routed is None and looks_like_command(text):
+            t_llm_route = time.perf_counter()
+            try:
+                routed = await route_with_llm(
+                    text, self._llm_provider(),
+                    [{"name": t["name"], "description": t["description"]}
+                     for t in registry.list()],
+                )
+            except Exception as exc:  # noqa: BLE001 — fall back to chat
+                logger.debug("Stage-2 routing failed: %s", exc)
+                routed = None
+            timings["nlu_llm_ms"] = (time.perf_counter() - t_llm_route) * 1000
 
         actions: list[dict[str, Any]] = []
         reply: str

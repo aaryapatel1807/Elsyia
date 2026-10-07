@@ -97,6 +97,7 @@ _ARG_HINTS: dict[str, str] = {
     "set_timer": '{"minutes": <number>, "label": "<optional>"}',
     "create_reminder": '{"title": "<title>", "due_at": "<ISO-8601>"}',
     "play_youtube": '{"query": "<what to play>"}',
+    "ask_user": '{"question": "<what you need to know>"}',
     "open_linkedin": '{"view": "feed|jobs|search:<keywords>|profile:<name>"}',
     "search_web": '{"query": "<query>"}',
     "draft_text": '{"instruction": "<what to draft>"}',
@@ -104,6 +105,7 @@ _ARG_HINTS: dict[str, str] = {
     "get_current_date": '{}',
     "get_weather": '{"location": "<city, optional>"}',
     "get_system_stats": '{}',
+    "morning_briefing": '{"location": "<city, optional>"}',
     "see_capture": '{"question": "<what to look at in the user\'s current screen capture>"}',
     "launch_application": '{"application": "<app name>"}',
 }
@@ -253,7 +255,7 @@ class AgentStep:
     tool: str
     args: dict[str, Any]
     say: str
-    status: str = "pending"  # pending|running|awaiting_confirmation|completed|failed|skipped
+    status: str = "pending"  # pending|running|awaiting_confirmation|awaiting_input|completed|failed|skipped
     needs_confirm: bool = False
     confirmation_message: str | None = None
     result: Any | None = None
@@ -279,7 +281,7 @@ class AgentPlan:
     plan_id: str
     message: str
     steps: list[AgentStep] = field(default_factory=list)
-    status: str = "running"  # running|awaiting_confirmation|completed|failed|no_plan|cancelled
+    status: str = "running"  # running|awaiting_confirmation|awaiting_input|completed|failed|no_plan|cancelled
     reply: str = ""
     timings_ms: dict[str, float] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
@@ -419,6 +421,17 @@ class AgentRunner:
         for step in plan.steps:
             if step.status != "pending":
                 continue
+            # ask_user never executes: the plan pauses and waits for Aarya's
+            # answer, which resumes via confirm_plan(user_input=...).
+            if step.tool == "ask_user":
+                question = str(
+                    step.args.get("question") or "I need your input to continue."
+                ).strip()
+                step.status = "awaiting_input"
+                step.confirmation_message = question
+                plan.status = "awaiting_input"
+                await emit(self._step_event("step_awaiting_input", plan, step))
+                return
             step.status = "running"
             t0 = time.perf_counter()
             await emit({
@@ -528,6 +541,13 @@ class AgentRunner:
                 f"{step.confirmation_message or 'This step needs your approval.'} "
                 "Say 'yes' or tap confirm and I'll carry on with the rest."
             )
+        if plan.status == "awaiting_input":
+            step = next(
+                (s for s in plan.steps if s.status == "awaiting_input"), None
+            )
+            question = (step.confirmation_message if step
+                        else "I need your input to continue.")
+            return f"{question} Reply and I'll carry on."
         if plan.status == "failed":
             step = next(s for s in plan.steps if s.status == "failed")
             head = (
@@ -596,6 +616,7 @@ class AgentRunner:
             "completed": "plan_completed",
             "failed": "plan_failed",
             "awaiting_confirmation": "awaiting_confirmation",
+            "awaiting_input": "awaiting_input",
             "no_plan": "no_plan",
         }[plan.status]
         await emit({"type": terminal, "plan": plan.to_dict(),
@@ -611,18 +632,36 @@ class AgentRunner:
         self,
         plan_id: str,
         confirmed: set[str],
+        user_input: str | None = None,
         event_sink: EventSink | None = None,
     ) -> AgentPlan | None:
-        """Resume a plan paused for confirmation. Returns None when unknown."""
+        """Resume a plan paused for confirmation or user input.
+
+        Returns None when unknown. When the plan is awaiting_input and no
+        user_input is given, the plan is returned unchanged (still waiting).
+        """
         async with self._lock:
             plan = self.get_plan(plan_id)
-            if plan is None or plan.status != "awaiting_confirmation":
+            if plan is None or plan.status not in (
+                "awaiting_confirmation", "awaiting_input"
+            ):
                 return None
-            plan.confirmed |= set(confirmed)
-            for step in plan.steps:
-                if step.status == "awaiting_confirmation":
-                    step.status = "pending"
-                    step.confirmation_message = None
+            if plan.status == "awaiting_input":
+                waiting = next(
+                    (s for s in plan.steps if s.status == "awaiting_input"), None
+                )
+                answer = (user_input or "").strip()
+                if waiting is None or not answer:
+                    return plan  # still waiting for the answer
+                waiting.status = "completed"
+                waiting.result = {"answer": answer}
+                waiting.confirmation_message = None
+            else:
+                plan.confirmed |= set(confirmed)
+                for step in plan.steps:
+                    if step.status == "awaiting_confirmation":
+                        step.status = "pending"
+                        step.confirmation_message = None
             plan.status = "running"
 
         async def emit(event: dict[str, Any]) -> None:
@@ -644,6 +683,7 @@ class AgentRunner:
             "completed": "plan_completed",
             "failed": "plan_failed",
             "awaiting_confirmation": "awaiting_confirmation",
+            "awaiting_input": "awaiting_input",
         }[plan.status]
         await emit({"type": terminal, "plan": plan.to_dict(),
                     "reply": plan.reply})

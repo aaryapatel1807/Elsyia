@@ -100,3 +100,72 @@ class GetSystemStatsTool(Tool):
         stats["disk_free_gb"] = round(disk.free / 1e9, 1)
         stats["disk_total_gb"] = round(disk.total / 1e9, 1)
         return stats
+
+
+class MorningBriefingTool(Tool):
+    """Jev's signature move: a spoken morning briefing.
+
+    Composes calendar events, weather, and pending reminders into one
+    summary — "here's your day". Imports sibling tools lazily so this
+    module never participates in import cycles at startup.
+    """
+
+    name = "morning_briefing"
+    description = (
+        "Compose a morning briefing: today's calendar events, current "
+        "weather, and pending reminders, as one spoken summary."
+    )
+
+    async def run(self, location: str = "") -> dict[str, Any]:
+        from app.services.tools.ambient_tools import GetWeatherTool
+
+        parts: list[str] = []
+        data: dict[str, Any] = {}
+
+        # Calendar (best-effort: Jev may not be connected yet).
+        try:
+            from app.services.jev.calendar import CalendarTodayTool
+
+            events = await CalendarTodayTool().run()
+            items = events.get("events", []) if isinstance(events, dict) else []
+            data["events"] = items
+            if items:
+                names = "; ".join(
+                    f"{e.get('title', '')} at {e.get('start', '')}" for e in items[:6]
+                )
+                parts.append(f"You have {len(items)} event(s) today: {names}.")
+            else:
+                parts.append("Your calendar is clear today.")
+        except Exception as exc:  # noqa: BLE001 — briefing must not die
+            data["events"] = []
+            data["calendar_error"] = str(exc)[:120]
+
+        # Weather (best-effort).
+        try:
+            weather = await GetWeatherTool().run(location=location)
+            data["weather"] = weather
+            parts.append(
+                f"Weather in {weather.get('location', 'your area')}: "
+                f"{weather.get('description', '')}, {weather.get('temp_c', '?')}°C, "
+                f"high {weather.get('day_high_c', '?')}°C."
+            )
+        except ToolError as exc:
+            data["weather_error"] = str(exc)[:120]
+
+        # Reminders (best-effort).
+        try:
+            from app.services.tools.reminders import ListRemindersTool
+
+            reminders = await ListRemindersTool().run()
+            items = reminders.get("reminders", []) if isinstance(reminders, dict) else []
+            data["reminders"] = items
+            if items:
+                names = "; ".join(r.get("title", "") for r in items[:5])
+                parts.append(f"{len(items)} pending reminder(s): {names}.")
+        except Exception as exc:  # noqa: BLE001
+            data["reminders"] = []
+            data["reminders_error"] = str(exc)[:120]
+
+        summary = " ".join(parts) or "I couldn't pull together your briefing."
+        data["summary"] = summary
+        return data

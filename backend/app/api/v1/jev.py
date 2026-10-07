@@ -350,6 +350,10 @@ class AgentRunRequest(BaseModel):
 
 class AgentConfirmRequest(BaseModel):
     confirmed: list[str] = Field(default_factory=list)
+    user_input: str | None = Field(
+        default=None,
+        description="Answer for a plan paused with ask_user (awaiting_input).",
+    )
     stream: bool = False
 
 
@@ -375,7 +379,7 @@ class AgentRunResponse(BaseModel):
 
 
 _TERMINAL_AGENT_EVENTS = {
-    "plan_completed", "plan_failed", "awaiting_confirmation", "no_plan",
+    "plan_completed", "plan_failed", "awaiting_confirmation", "awaiting_input", "no_plan",
 }
 
 
@@ -457,7 +461,10 @@ async def jev_agent_run(request: AgentRunRequest):
 
 @router.post("/agent/{plan_id}/confirm")
 async def jev_agent_confirm(plan_id: str, request: AgentConfirmRequest):
-    """Resume a confirmation-paused plan with freshly approved tools."""
+    """Resume a confirmation- or input-paused plan.
+
+    Pass {"user_input": "..."} to answer a plan paused with ask_user.
+    """
     from fastapi import HTTPException
 
     runner = get_agent_runner()
@@ -467,7 +474,8 @@ async def jev_agent_confirm(plan_id: str, request: AgentConfirmRequest):
     if request.stream:
         async def _resume(emit) -> None:
             plan = await runner.confirm_plan(
-                plan_id, confirmed, event_sink=emit
+                plan_id, confirmed, user_input=request.user_input,
+                event_sink=emit,
             )
             if plan is None:
                 await emit({
@@ -476,7 +484,9 @@ async def jev_agent_confirm(plan_id: str, request: AgentConfirmRequest):
                 })
 
         return StreamingResponse(_agent_sse(_resume), media_type="text/event-stream")
-    plan = await runner.confirm_plan(plan_id, confirmed)
+    plan = await runner.confirm_plan(
+        plan_id, confirmed, user_input=request.user_input
+    )
     if plan is None:
         raise HTTPException(
             status_code=409, detail="Plan is not awaiting confirmation."

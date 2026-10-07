@@ -119,6 +119,11 @@ _SYSTEM_STATS_PHRASES = {
     "cpu usage", "memory usage", "disk space", "how much disk space",
     "is my computer slow",
 }
+_BRIEFING_PHRASES = {
+    "morning briefing", "brief me", "briefing", "what does my day look like",
+    "how does my day look", "give me my briefing", "day briefing",
+    "what's on today", "whats on today", "run me through my day",
+}
 
 
 def _route_jev_intent(text: str, phrase: str, lowered: str) -> ToolIntent | None:
@@ -277,6 +282,9 @@ def route_intent(message: str) -> ToolIntent | None:
 
     if phrase in _SYSTEM_STATS_PHRASES:
         return ToolIntent("get_system_stats", {}, 0.95)
+
+    if phrase in _BRIEFING_PHRASES:
+        return ToolIntent("morning_briefing", {}, 0.96)
 
     if lowered in {"system info", "show system info", "what computer am i using", "computer info"}:
         return ToolIntent("get_system_info", {}, 0.99)
@@ -468,3 +476,92 @@ def _fuzzy_route(lowered: str) -> ToolIntent | None:
         return None
     _, tool, args = best
     return ToolIntent(tool, dict(args), 0.72)
+
+
+# --- Stage-2 routing: local LLM classifies ambiguous commands --------------
+# The hybrid pattern validated across agent frameworks: deterministic
+# regexes short-circuit the obvious, the fuzzy fallback catches near-misses,
+# and ONLY command-like utterances that survive both reach the local LLM.
+# "LLM proposes, deterministic systems dispose" — the model picks a tool,
+# but the name is validated against the real registry and arguments are
+# type-checked by the tool itself.
+
+_COMMAND_VERBS = frozenset({
+    # Action verbs only — question words (what/how/tell) stay out on purpose:
+    # questions belong to the conversational LLM, not tool classification.
+    "open", "launch", "start", "close", "play", "pause", "resume", "stop",
+    "send", "text", "message", "email", "mail", "call", "schedule",
+    "create", "add", "set", "cancel", "delete", "remove", "remind",
+    "search", "find", "look", "check", "show", "list",
+    "take", "write", "draft", "note", "summarize", "translate",
+    "turn", "switch", "enable", "disable", "mute", "unmute",
+    "dim", "brighten", "lower", "raise", "increase", "decrease",
+})
+
+_CLASSIFY_PROMPT = """You map a voice command to one tool call. Reply with STRICT JSON only.
+
+TOOLS:
+{tool_list}
+
+RULES:
+- Output exactly: {{"tool": "<tool name>", "args": {{<arg>: <value>}}}}.
+- Use ONLY the listed tool names. Prefer the most specific tool.
+- Keep args minimal: only what the command states.
+- If the command matches NO tool, output {{"tool": null, "args": {{}}}}.
+
+Command: "{text}"
+"""
+
+
+def looks_like_command(text: str) -> bool:
+    """Heuristic: short utterance starting with an action/question verb."""
+    words = (text or "").strip().lower().split()
+    return 2 <= len(words) <= 15 and words[0].strip("?!.,") in _COMMAND_VERBS
+
+
+async def route_with_llm(
+    text: str, llm: object, tool_catalog: list[dict]
+) -> ToolIntent | None:
+    """Stage-2 routing: ask the local LLM to classify an ambiguous command.
+
+    `tool_catalog` is [{"name": ..., "description": ...}, ...] from the real
+    registry. Returns None when the model abstains, errs, or names an
+    unknown tool — the caller then falls back to the conversational path.
+    """
+    known = {t["name"] for t in tool_catalog if t.get("name")}
+    if not known:
+        return None
+    tool_list = "\n".join(
+        f"- {t['name']}: {t.get('description', '')[:120]}"
+        for t in tool_catalog if t.get("name")
+    )
+    prompt = _CLASSIFY_PROMPT.format(
+        tool_list=tool_list, text=(text or "").strip()[:300]
+    )
+    try:
+        import json as _json
+
+        chunks: list[str] = []
+        async for chunk in llm.generate(  # type: ignore[union-attr]
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=300,
+        ):
+            chunks.append(chunk)
+        raw = "".join(chunks).strip()
+        if raw.startswith("```"):
+            import re as _re
+            raw = _re.sub(r"^```[a-zA-Z]*\n?", "", raw)
+            raw = _re.sub(r"\n?```$", "", raw).strip()
+        data = _json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    tool = data.get("tool")
+    if not isinstance(tool, str) or tool not in known:
+        return None
+    args = data.get("args")
+    if not isinstance(args, dict):
+        args = {}
+    return ToolIntent(tool, args, 0.80)
