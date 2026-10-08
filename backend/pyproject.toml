@@ -46,6 +46,9 @@ dependencies = [
     "trafilatura>=2.0.0",
     # Jev reminders: native cross-platform desktop notifications
     "desktop-notifier>=5.0.0",
+    # Jev calendar: recurring events via pythonic gcsa API (MIT) over the
+    # official Google Calendar API; raw-API client kept for one-off events
+    "gcsa>=2.7.0",
 ]
 
 [project.optional-dependencies]

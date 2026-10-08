@@ -55,6 +55,42 @@ Non-visual, additive backend work (UI freeze honored). All commits local.
 
 ---
 
+## Follow-up batch — 2026-10-08 (unreleased)
+
+Decided items from the overnight report, implemented in one pass.
+Non-visual, additive backend work (UI freeze honored). All commits local.
+
+### Added
+- **Memory-review API**: the consolidation pipeline's pending queue is now
+  reviewable — `GET /memory/pending` (oldest first), `POST
+  /memory/pending/{id}/approve`, `POST /memory/pending/{id}/reject`
+  (deletes). Built for later UI work; no UI added.
+- **MemOS-style phase-2 memory schema**: `valid_from`/`valid_to` temporal
+  validity columns plus `trust` (0..1) and `provenance` scores on every
+  memory. Retrieval now excludes expired / not-yet-valid facts and weights
+  scores by trust (`× (0.5 + 0.5·trust)`; trust=1.0 behaves exactly as
+  before). Legacy databases migrate automatically with safe defaults.
+  New endpoints: `PATCH /memory/{id}/validity`, `PATCH
+  /memory/{id}/trust`; create/list/export responses carry the new fields.
+- **Recurring calendar events via gcsa** (MIT): new
+  `create_recurring_calendar_event` tool — `daily`, `weekly`,
+  `weekdays` (Mon–Fri), `monthly`, `yearly`, optional `count`/`until` —
+  built on gcsa's pythonic Event/Recurrence API over Jev's existing OAuth
+  credentials. The raw-API one-off event tools are untouched. Natural
+  language: "schedule breakfast every weekday at 8am" routes to it.
+  Added to the confirmation-gated tool set (writes to Aarya's calendar).
+
+### Tests
+- 195 passing (was 158): new `test_memory_review` (11), `test_memory_temporal`
+  (11), `test_calendar_recurrence` (15).
+
+### Dependencies
+- `gcsa>=2.7.0` (MIT; transitive: `tzlocal` MIT, `beautiful-date` MIT,
+  `python-dateutil` dual Apache-2.0/BSD — all permissive, license-verified
+  from wheel metadata before adding).
+
+---
+
 ## Phase 1 — Runtime Fixes
 
 ### Fixed

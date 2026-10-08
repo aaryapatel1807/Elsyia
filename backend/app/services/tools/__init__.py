@@ -62,6 +62,7 @@ from app.services.jev.calendar import (
     CalendarTodayTool,
     ConnectCalendarTool,
     CreateCalendarEventTool,
+    CreateRecurringCalendarEventTool,
 )
 from app.services.jev.gmail import (
     CheckGmailTool,
@@ -157,6 +158,7 @@ AVAILABLE_TOOLS: list[Tool] = [
     ConnectGmailTool(),
     CalendarTodayTool(),
     CreateCalendarEventTool(),
+    CreateRecurringCalendarEventTool(),
     ConnectCalendarTool(),
     SetTimerTool(),
     TakeNoteTool(),
@@ -192,6 +194,7 @@ for _tool in AVAILABLE_TOOLS:
                 # --- Jev: acting on the outside world needs Aarya's say-so ---
                 "send_gmail",
                 "create_calendar_event",
+                "create_recurring_calendar_event",
             },
         )
 

@@ -145,6 +145,119 @@ class CreateCalendarEventTool(Tool):
         )
 
 
+def _gcsa_calendar():
+    """Build a gcsa GoogleCalendar bound to Jev's existing OAuth credentials."""
+    from gcsa.google_calendar import GoogleCalendar
+
+    return GoogleCalendar(credentials=calendar_oauth().credentials())
+
+
+_RECURRENCE_RULES = {
+    # name -> (gcsa freq, by_week_day)
+    "daily": ("DAILY", None),
+    "weekly": ("WEEKLY", None),
+    "weekdays": ("WEEKLY", ["MO", "TU", "WE", "TH", "FR"]),
+    "monthly": ("MONTHLY", None),
+    "yearly": ("YEARLY", None),
+}
+
+
+def build_recurrence_rule(
+    recurrence: str,
+    count: int = 0,
+    until: str = "",
+) -> str:
+    """Build an RFC-5545 RRULE string for a named recurrence via gcsa.
+
+    Raises ToolError on unknown recurrence names or bad count/until values.
+    """
+    from gcsa.recurrence import FR, MO, SA, SU, TH, TU, WE, Recurrence
+
+    name = (recurrence or "").strip().lower()
+    if name not in _RECURRENCE_RULES:
+        raise ToolError(
+            "Recurrence must be one of: daily, weekly, weekdays, monthly, yearly."
+        )
+    freq, by_days = _RECURRENCE_RULES[name]
+    day_objects = None
+    if by_days:
+        day_map = {"MO": MO, "TU": TU, "WE": WE, "TH": TH, "FR": FR, "SA": SA, "SU": SU}
+        day_objects = [day_map[day] for day in by_days]
+    rule_count = None
+    if count:
+        try:
+            rule_count = int(count)
+        except (TypeError, ValueError) as exc:
+            raise ToolError("count must be a positive integer.") from exc
+        if rule_count <= 0:
+            raise ToolError("count must be a positive integer.")
+    until_dt = None
+    if until and until.strip():
+        try:
+            until_dt = datetime.fromisoformat(until.strip().replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ToolError("until must be ISO-8601, e.g. 2026-12-31.") from exc
+        if until_dt.tzinfo is None:
+            until_dt = until_dt.replace(tzinfo=timezone.utc)
+    return Recurrence.rule(
+        freq=freq, by_week_day=day_objects, count=rule_count, until=until_dt
+    )
+
+
+class CreateRecurringCalendarEventTool(Tool):
+    name = "create_recurring_calendar_event"
+    description = (
+        "Create a recurring Google Calendar event. Recurrence is one of: "
+        "daily, weekly, weekdays (Mon-Fri), monthly, yearly. Optional count "
+        "(number of occurrences) or until (ISO-8601 end date). Start (and "
+        "optional end) are ISO-8601 date/times; end defaults to start + 1 hour. "
+        "Requires confirmation because it writes to Aarya's calendar."
+    )
+
+    async def run(
+        self,
+        title: str,
+        start: str,
+        end: str = "",
+        description: str = "",
+        recurrence: str = "weekly",
+        count: int = 0,
+        until: str = "",
+    ) -> dict[str, Any]:
+        _require_connected()
+        if not title.strip():
+            raise ToolError("An event title is required.")
+        start_dt = datetime.fromisoformat(_parse_iso(start).replace("Z", "+00:00"))
+        end_dt = (
+            datetime.fromisoformat(_parse_iso(end).replace("Z", "+00:00"))
+            if end.strip()
+            else None
+        )
+        rule = build_recurrence_rule(recurrence, count, until)
+
+        def _call():
+            from gcsa.event import Event
+
+            event = Event(
+                title.strip(),
+                start=start_dt,
+                end=end_dt,
+                description=description.strip() or None,
+                recurrence=[rule],
+            )
+            created = _gcsa_calendar().add_event(event)
+            return {
+                "id": getattr(created, "event_id", ""),
+                "title": title.strip(),
+                "start": start_dt.isoformat(),
+                "end": (end_dt or start_dt).isoformat(),
+                "recurrence": recurrence.strip().lower(),
+                "rrule": rule,
+            }
+
+        return await asyncio.to_thread(_call)
+
+
 class ConnectCalendarTool(Tool):
     name = "connect_calendar"
     description = (

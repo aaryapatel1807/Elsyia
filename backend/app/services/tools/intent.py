@@ -106,6 +106,42 @@ _CALENDAR_NATURAL_RE = re.compile(
     r"(?:at\s+\d.*))$",
     re.IGNORECASE,
 )
+# Recurring events: "schedule breakfast every weekday at 8am",
+# "add gym every monday at 6pm". Tried BEFORE _CALENDAR_NATURAL_RE.
+_CALENDAR_RECURRING_RE = re.compile(
+    r"^(?:schedule|add)(?:\s+an?)?(?:\s+calendar)?(?:\s+event)?\s+(.+?)\s+every\s+"
+    r"(day|daily|weekday|weekdays|week|weekly|month|monthly|year|yearly|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday)s?\b\s*(.*)$",
+    re.IGNORECASE,
+)
+_RECURRING_FREQ_WORDS = {
+    "day": "daily",
+    "daily": "daily",
+    "weekday": "weekdays",
+    "weekdays": "weekdays",
+    "week": "weekly",
+    "weekly": "weekly",
+    "month": "monthly",
+    "monthly": "monthly",
+    "year": "yearly",
+    "yearly": "yearly",
+    "monday": "weekly",
+    "tuesday": "weekly",
+    "wednesday": "weekly",
+    "thursday": "weekly",
+    "friday": "weekly",
+    "saturday": "weekly",
+    "sunday": "weekly",
+}
+_WEEKDAY_NAMES = {
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+}
 _NOTE_RE = re.compile(
     r"^(?:take\s+a\s+note|note\s+down|remember)\s+(?:that\s+)?(.+)$", re.IGNORECASE
 )
@@ -242,6 +278,37 @@ def _route_jev_intent(text: str, phrase: str, lowered: str) -> ToolIntent | None
                 "create_reminder",
                 {"title": _clean(match.group(1)), "due_at": when.isoformat()},
                 0.94,
+            )
+
+    # Recurring calendar event: "schedule breakfast every weekday at 8am".
+    match = _CALENDAR_RECURRING_RE.match(text)
+    if match:
+        freq_word = match.group(2).lower().rstrip("s")
+        # "weekdays" -> rstrip("s") gives "weekday"; normalize via the map.
+        recurrence = _RECURRING_FREQ_WORDS.get(freq_word)
+        if recurrence is None:
+            recurrence = _RECURRING_FREQ_WORDS.get(match.group(2).lower())
+        rest = match.group(3).strip()
+        if not rest:
+            # No time given: named weekday -> next <weekday> 8am, else tomorrow 8am.
+            if freq_word in _WEEKDAY_NAMES:
+                rest = f"{freq_word} at 8am"
+            else:
+                rest = "tomorrow at 8am"
+        elif freq_word in _WEEKDAY_NAMES and freq_word not in rest.lower():
+            # Anchor the first occurrence to the named weekday:
+            # "every monday at 6pm" starts next Monday, not just next 6pm.
+            rest = f"{freq_word} {rest}"
+        start = parse_datetime(rest)
+        if start is not None and recurrence is not None:
+            return ToolIntent(
+                "create_recurring_calendar_event",
+                {
+                    "title": _clean(match.group(1)),
+                    "start": start.isoformat(),
+                    "recurrence": recurrence,
+                },
+                0.93,
             )
 
     # Natural-language calendar event: "schedule dentist tomorrow at 9am".
