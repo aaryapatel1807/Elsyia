@@ -53,8 +53,12 @@ binaries += b
 hiddenimports += h
 
 # Heavy native dependencies: binaries + data files must be collected
-# explicitly or the frozen app crashes on import.
-for pkg in ("ctranslate2", "onnxruntime", "faster_whisper", "piper", "openwakeword"):
+# explicitly or the frozen app crashes on import. (_collect tolerates
+# packages that are not installed on the build machine, so Windows-only
+# packages are safe to list here — they get picked up on the Windows runner.)
+for pkg in ("ctranslate2", "onnxruntime", "faster_whisper", "piper", "openwakeword",
+            "cryptography", "pyaudio", "sounddevice", "pynput", "psutil",
+            "comtypes", "pycaw"):
     d, b, h = _collect(pkg)
     datas += d
     binaries += b
