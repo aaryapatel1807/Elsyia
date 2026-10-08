@@ -107,3 +107,10 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
+
+[tool.uv]
+# openwakeword hard-depends on tflite-runtime, which ships no wheels for
+# CPython 3.12 or for Windows at all. Elsyia only uses openwakeword's ONNX
+# inference path (see app/services/elsyia/wakeword.py), so this override
+# drops the TFLite edge — the package imports and runs fine without it.
+override-dependencies = ["tflite-runtime; python_version < '3.0'"]
