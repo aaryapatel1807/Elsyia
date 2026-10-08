@@ -1,8 +1,8 @@
-# Release Jev installers.
+# Release ELSYIA installers.
 #
 # Trigger: push a version tag, e.g.   git tag v0.2.0 && git push origin v0.2.0
 # Each runner builds for its own OS (PyInstaller cannot cross-compile):
-#   windows-latest -> jev-backend.exe + nsis installer
+#   windows-latest -> ELSYIA-backend.exe + nsis installer
 #   macos-latest   -> dmg
 #   ubuntu-latest  -> AppImage
 # Then a GitHub Release is created on the tag with all installers attached.
@@ -11,7 +11,7 @@
 # macOS Gatekeeper will show a warning on first launch — documented in
 # the README's Packaging section.
 
-name: Release Jev installers
+name: Release ELSYIA installers
 
 on:
   push:
@@ -92,7 +92,7 @@ jobs:
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: jev-${{ matrix.os }}
+          name: ELSYIA-${{ matrix.os }}
           path: |
             frontend/release/*.exe
             frontend/release/*.appx
