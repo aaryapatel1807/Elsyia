@@ -13,6 +13,10 @@ class MemoryCreateRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=10000)
     scope: str = Field(default="default", min_length=1, max_length=100)
     category: str = Field(default="general", min_length=1, max_length=50)
+    valid_from: str | None = Field(default=None, description="ISO-8601 start of validity")
+    valid_to: str | None = Field(default=None, description="ISO-8601 end of validity")
+    trust: float | None = Field(default=None, ge=0.0, le=1.0)
+    provenance: str | None = Field(default=None, max_length=50)
 
 
 class MemoryResponse(BaseModel):
@@ -26,6 +30,31 @@ class MemoryResponse(BaseModel):
     updated_at: datetime
     source: str = "explicit"
     approved: bool = True
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    trust: float = 1.0
+    provenance: str = "explicit"
+
+
+class MemoryPendingResponse(BaseModel):
+    """The pending-review queue: staged facts awaiting approval."""
+
+    memories: list[MemoryResponse]
+    count: int
+
+
+class MemoryValidityRequest(BaseModel):
+    """Set (or clear with null) the temporal validity window of a memory."""
+
+    valid_from: str | None = Field(default=None, description="ISO-8601 start of validity")
+    valid_to: str | None = Field(default=None, description="ISO-8601 end of validity")
+
+
+class MemoryTrustRequest(BaseModel):
+    """Set the trust score and provenance of a memory."""
+
+    trust: float = Field(..., ge=0.0, le=1.0)
+    provenance: str | None = Field(default=None, max_length=50)
 
 
 class MemoryListResponse(BaseModel):

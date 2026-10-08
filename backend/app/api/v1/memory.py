@@ -11,14 +11,26 @@ from app.models import (
     MemoryCreateRequest,
     MemoryExportResponse,
     MemoryListResponse,
+    MemoryPendingResponse,
     MemoryReindexResponse,
     MemoryResponse,
     MemoryStatsResponse,
+    MemoryTrustRequest,
+    MemoryValidityRequest,
 )
 from app.services.memory import MemoryRecord, get_memory_store
 
 logger = get_logger("api.memory")
 router = APIRouter()
+
+
+def _to_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _to_response(record: MemoryRecord) -> MemoryResponse:
@@ -32,6 +44,10 @@ def _to_response(record: MemoryRecord) -> MemoryResponse:
         updated_at=datetime.fromisoformat(record.updated_at),
         source=record.source,
         approved=record.approved,
+        valid_from=_to_datetime(record.valid_from),
+        valid_to=_to_datetime(record.valid_to),
+        trust=record.trust,
+        provenance=record.provenance,
     )
 
 
@@ -46,7 +62,15 @@ def create_memory(request: MemoryCreateRequest) -> MemoryResponse:
     _ensure_enabled()
     try:
         return _to_response(
-            get_memory_store().save(request.content, request.scope, request.category)
+            get_memory_store().save(
+                request.content,
+                request.scope,
+                request.category,
+                valid_from=request.valid_from,
+                valid_to=request.valid_to,
+                trust=request.trust,
+                provenance=request.provenance,
+            )
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -105,6 +129,94 @@ def export_memories(
     _ensure_enabled()
     memories = get_memory_store().export(scope)
     return MemoryExportResponse(scope=scope, memories=memories, count=len(memories))
+
+
+@router.get("/pending", response_model=MemoryPendingResponse)
+def list_pending_memories(
+    scope: str = Query(default="default", min_length=1, max_length=100),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> MemoryPendingResponse:
+    """List the pending-review queue: staged facts awaiting approval.
+
+    The background consolidation pipeline writes observed facts here with
+    approved=False; nothing in this queue is used for retrieval until
+    approved. Ordered oldest-first so review follows arrival order.
+    """
+    _ensure_enabled()
+    records = get_memory_store().pending(scope, limit)
+    memories = [_to_response(record) for record in records]
+    return MemoryPendingResponse(memories=memories, count=len(memories))
+
+
+@router.post("/pending/{memory_id}/approve")
+def approve_pending_memory(
+    memory_id: UUID, scope: str = Query(default="default")
+) -> dict[str, object]:
+    """Approve one pending memory from the review queue for future retrieval."""
+    _ensure_enabled()
+    approved = get_memory_store().approve(memory_id, scope)
+    if not approved:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return {"approved": True, "id": memory_id, "scope": scope}
+
+
+@router.post("/pending/{memory_id}/reject")
+def reject_pending_memory(
+    memory_id: UUID, scope: str = Query(default="default")
+) -> dict[str, object]:
+    """Reject one pending memory from the review queue (deletes it)."""
+    _ensure_enabled()
+    deleted = get_memory_store().delete(memory_id, scope)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return {"rejected": True, "id": memory_id, "scope": scope}
+
+
+@router.patch("/{memory_id}/validity", response_model=MemoryResponse)
+def set_memory_validity(
+    memory_id: UUID,
+    request: MemoryValidityRequest,
+    scope: str = Query(default="default"),
+) -> MemoryResponse:
+    """Set (or clear with null) the temporal validity window of a memory."""
+    _ensure_enabled()
+    store = get_memory_store()
+    try:
+        updated = store.set_validity(
+            memory_id,
+            scope,
+            valid_from=request.valid_from,
+            valid_to=request.valid_to,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    record = store.get(memory_id, scope)
+    assert record is not None
+    return _to_response(record)
+
+
+@router.patch("/{memory_id}/trust", response_model=MemoryResponse)
+def set_memory_trust(
+    memory_id: UUID,
+    request: MemoryTrustRequest,
+    scope: str = Query(default="default"),
+) -> MemoryResponse:
+    """Set the trust score (0..1) and provenance of a memory."""
+    _ensure_enabled()
+    store = get_memory_store()
+    try:
+        updated = store.set_trust(
+            memory_id, scope, trust=request.trust, provenance=request.provenance
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    record = store.get(memory_id, scope)
+    assert record is not None
+    return _to_response(record)
 
 
 @router.post("/{memory_id}/approve")

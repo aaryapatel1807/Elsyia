@@ -17,6 +17,9 @@ from app.models.memory import (
     MemoryStatsResponse,
     MemoryReindexResponse,
     MemoryExportResponse,
+    MemoryPendingResponse,
+    MemoryValidityRequest,
+    MemoryTrustRequest,
 )
 from app.models.tools import ToolExecuteRequest, ToolCatalogResponse
 from app.models.plugins import PluginCatalogResponse, PluginExecuteRequest, PluginToggleRequest
