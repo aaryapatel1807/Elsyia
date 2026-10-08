@@ -60,7 +60,7 @@ def test_fuzzy_fallback_near_miss():
     name, args, conf = _route("could you check my inbox please")
     assert name == "check_gmail"
     assert conf < 0.9  # fuzzy, not regex
-    name, _, _ = _route("hey jev what is on my clipboard")
+    name, _, _ = _route("hey elsyia what is on my clipboard")
     assert name == "read_clipboard"
 
 

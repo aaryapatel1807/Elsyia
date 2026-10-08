@@ -1,4 +1,4 @@
-"""Jev app integrations — real, free, ToS-safe.
+"""Elsyia app integrations — real, free, ToS-safe.
 
 Each integration here genuinely works end-to-end from a voice command.
 The approach is honest about platform limits:

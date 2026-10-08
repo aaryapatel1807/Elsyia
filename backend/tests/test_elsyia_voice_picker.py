@@ -1,4 +1,4 @@
-"""Tests for the Jev TTS voice picker.
+"""Tests for the Elsyia TTS voice picker.
 
 Piper itself, the mic, and the network are all faked — no model downloads,
 no audio hardware. What is exercised for real: voice resolution precedence,
@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-import app.services.jev.voice_picker as vp
-from app.services.jev.voice_picker import (
+import app.services.elsyia.voice_picker as vp
+from app.services.elsyia.voice_picker import (
     JARVIS_DEFAULT_VOICE,
     VoiceNotAvailable,
     download_voice,
@@ -29,7 +29,7 @@ class _FakeSettings:
     PIPER_MODELS_DIR = "models/piper"
     PIPER_VOICE = "en_US-lessac-medium"
     PIPER_SPEED = 1.0
-    JEV_TTS_VOICE = ""
+    ELSYIA_TTS_VOICE = ""
 
 
 class _FakeProvider:
@@ -95,21 +95,21 @@ def test_installed_detection(models_dir):
 def test_resolve_falls_back_to_jarvis_default(tmp_path, models_dir, monkeypatch):
     class S(_FakeSettings):
         PIPER_VOICE = ""
-        JEV_TTS_VOICE = ""
+        ELSYIA_TTS_VOICE = ""
     monkeypatch.setattr(vp, "get_settings", lambda: S())
     assert resolve_active_voice(tmp_path / "voice.json", models_dir) == JARVIS_DEFAULT_VOICE
 
 
 def test_resolve_prefers_env_over_default(tmp_path, models_dir, monkeypatch):
     class S(_FakeSettings):
-        JEV_TTS_VOICE = "en_US-ryan-medium"
+        ELSYIA_TTS_VOICE = "en_US-ryan-medium"
     monkeypatch.setattr(vp, "get_settings", lambda: S())
     assert resolve_active_voice(tmp_path / "voice.json", models_dir) == "en_US-ryan-medium"
 
 
 def test_resolve_prefers_persisted_over_env(tmp_path, models_dir, monkeypatch):
     class S(_FakeSettings):
-        JEV_TTS_VOICE = "en_US-ryan-medium"
+        ELSYIA_TTS_VOICE = "en_US-ryan-medium"
     monkeypatch.setattr(vp, "get_settings", lambda: S())
     state = tmp_path / "voice.json"
     state.write_text(json.dumps({"voice": "en_GB-alan-medium"}))

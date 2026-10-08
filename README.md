@@ -28,10 +28,10 @@ This is **Phase 1** — the foundation. A beautiful, voice-enabled desktop assis
 
 ---
 
-## 🎩 Jev — the assistant at the heart of Elysia
+## 🎩 Elsyia — the assistant at the heart of Elysia
 
-**Jev** (like "Jeeves") is Elysia's named AI butler: a real, working voice
-assistant, not a demo. Press **Ctrl+Shift+J** anywhere and Jev appears —
+**Elsyia** (like "Jeeves") is Elysia's named AI butler: a real, working voice
+assistant, not a demo. Press **Ctrl+Shift+J** anywhere and Elsyia appears —
 hold to talk, release, and he thinks and speaks back.
 
 ### The voice loop
@@ -45,7 +45,7 @@ Engineered for latency: faster-whisper `tiny` (int8, beam size 1), a snappy
 local Ollama model with a small context window, deterministic intent routing
 that skips the LLM entirely for commands, and sentence-chunked TTS so the
 first sentence starts speaking as soon as it is ready. Every turn reports
-per-stage timings (`/jev/status`, `timings_ms` on every response).
+per-stage timings (`/elsyia/status`, `timings_ms` on every response).
 
 ### Run it
 
@@ -67,12 +67,12 @@ npm run dev            # web UI at http://localhost:5173
 npm run electron       # full desktop app with the Ctrl+Shift+J hotkey
 ```
 
-Health check: `GET http://127.0.0.1:8000/api/v1/jev/status` reports STT,
+Health check: `GET http://127.0.0.1:8000/api/v1/elsyia/status` reports STT,
 LLM, TTS, Gmail and Calendar state in one call.
 
-### What Jev can do
+### What Elsyia can do
 
-| Say | Jev does |
+| Say | Elsyia does |
 |---|---|
 | "play lo-fi beats on YouTube" | Opens the exact video (with free Data API key) or YouTube search |
 | "pause" / "next song" | System media keys (Windows) |
@@ -83,39 +83,39 @@ LLM, TTS, Gmail and Calendar state in one call.
 | "send email to a@b.com subject hi saying hello" | Sends via Gmail (asks first) |
 | "what's on my calendar" / "schedule dentist at …" | Google Calendar via the official API |
 | "set a timer for 10 minutes called pasta" | Local persistent timer |
-| "take a note buy milk" / "read my notes" | Timestamped notes at `~/.jev/notes.md` |
+| "take a note buy milk" / "read my notes" | Timestamped notes at `~/.elsyia/notes.md` |
 | "what time is it" / "open calculator" / "remind me …" | The full existing Elysia tool suite |
 
 Destructive or outward-facing actions (sending email, creating calendar
-events, deleting files, pressing keys) keep a confirmation step — Jev has
+events, deleting files, pressing keys) keep a confirmation step — Elsyia has
 full permission to act, and asks once before doing anything irreversible.
 
 ### Honest limits
 
 - **WhatsApp:** there is no free official API for personal WhatsApp
-  messaging or reading chats. Jev uses `wa.me` deep links — the chat opens
+  messaging or reading chats. Elsyia uses `wa.me` deep links — the chat opens
   with your text prefilled and you press send. No scrapers, no unofficial
   automation, nothing against WhatsApp's terms.
 - **LinkedIn:** posting via API requires a LinkedIn partnership, which is
-  not available. Jev opens feeds, jobs, search and profiles; it does not
+  not available. Elsyia opens feeds, jobs, search and profiles; it does not
   fake posting.
 - **Spotify:** full Web API playback control needs per-user OAuth and
-  Spotify Premium. Jev opens Spotify and drives playback with media keys;
+  Spotify Premium. Elsyia opens Spotify and drives playback with media keys;
   the Web API path is documented as a future step, not faked.
 - **YouTube:** without a `YOUTUBE_API_KEY`, "play X" opens search results
   rather than the exact video. The key is free with 10,000 quota units/day.
 - **Media keys** (pause/next/previous) work on Windows with
   `DESKTOP_INPUT_ENABLED=true`.
-- **Gmail/Calendar** need a one-time OAuth setup (below). Until then Jev
+- **Gmail/Calendar** need a one-time OAuth setup (below). Until then Elsyia
   tells you exactly how to connect instead of failing silently.
 
 ### Connect Gmail / Calendar (one-time, about 5 minutes)
 
-Jev uses Google's official OAuth2 desktop-app flow. **You create the OAuth
+Elsyia uses Google's official OAuth2 desktop-app flow. **You create the OAuth
 client yourself — nothing is created in your Google account by this repo.**
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → create
-   a project (any name, e.g. "Jev").
+   a project (any name, e.g. "Elsyia").
 2. **APIs & Services → Library:** enable **Gmail API** and
    **Google Calendar API**.
 3. **APIs & Services → OAuth consent screen:** choose **External**, fill in
@@ -124,54 +124,54 @@ client yourself — nothing is created in your Google account by this repo.**
    `.../auth/calendar`.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**
    → application type **Desktop app** → download the JSON.
-5. Set `JEV_GOOGLE_CLIENT_JSON=/path/to/your/client_secret.json` in `.env`
-   (or `JEV_GOOGLE_CLIENT_ID` / `JEV_GOOGLE_CLIENT_SECRET`).
-6. Say **"Jev, connect Gmail"** — your browser opens Google's consent page;
-   approve, and the token is stored locally at `~/.jev/`. Same for
-   **"Jev, connect calendar"**.
+5. Set `ELSYIA_GOOGLE_CLIENT_JSON=/path/to/your/client_secret.json` in `.env`
+   (or `ELSYIA_GOOGLE_CLIENT_ID` / `ELSYIA_GOOGLE_CLIENT_SECRET`).
+6. Say **"Elsyia, connect Gmail"** — your browser opens Google's consent page;
+   approve, and the token is stored locally at `~/.elsyia/`. Same for
+   **"Elsyia, connect calendar"**.
 
-Jev never touches your live mailbox during development — the test suite
+Elsyia never touches your live mailbox during development — the test suite
 mocks the Gmail API.
 
-### Jev's local data
+### Elsyia's local data
 
-Everything Jev owns lives in `~/.jev/` (override with `JEV_DATA_DIR`):
+Everything Elsyia owns lives in `~/.elsyia/` (override with `ELSYIA_DATA_DIR`):
 `contacts.json` (WhatsApp name → number map),
 `notes.md`, and per-service Google OAuth tokens. Plain files, human-readable,
 yours to edit.
 
 ### Wake word — hands-free summoning
 
-Jev can listen for a wake phrase and summon itself, "Hey Siri" style. The
+Elsyia can listen for a wake phrase and summon itself, "Hey Siri" style. The
 listener is a tiny on-device keyword spotter (openWakeWord, local ONNX
 inference): it idles on the microphone watching only for the phrase, then
 plays a chime, opens the overlay, and starts the normal voice loop. When
 your turn finishes, it goes back to sleep.
 
 **It is off by default.** Turn it on with the **Wake word** checkbox in the
-Jev overlay — the always-on microphone is your explicit choice. You can
-also start the backend with `JEV_WAKE_ENABLED=true`; the checkbox state is
-remembered in `~/.jev/wakeword.json`.
+Elsyia overlay — the always-on microphone is your explicit choice. You can
+also start the backend with `ELSYIA_WAKE_ENABLED=true`; the checkbox state is
+remembered in `~/.elsyia/wakeword.json`.
 
 **Privacy:** no audio ever leaves your machine. The mic stream is scored
 in 80 ms frames on-device and discarded immediately — nothing is recorded,
 stored, or transmitted. While a turn runs, the listener pauses itself so
-Jev's own reply can't wake it again.
+Elsyia's own reply can't wake it again.
 
 **Out of the box** it listens for **"hey jarvis"** (openWakeWord's
 community model, downloaded automatically on first use). To teach it
-**"hey jev"** in your own voice:
+**"hey elsyia"** in your own voice:
 
-1. Record ~50 short clips of yourself saying "hey jev" (vary distance and
+1. Record ~50 short clips of yourself saying "hey elsyia" (vary distance and
    room), plus ~20 clips of background noise and silence.
 2. Train a model with the openWakeWord training notebook
    ([Google Colab](https://colab.research.google.com/github/dscripka/openWakeWord/blob/main/notebooks/train_openwakeword.ipynb))
    and export the `.onnx` file.
-3. Drop it into `~/.jev/wakeword/hey_jev.onnx` and set
-   `JEV_WAKE_MODEL=~/.jev/wakeword/hey_jev.onnx` in `backend/.env`.
+3. Drop it into `~/.elsyia/wakeword/hey_elsyia.onnx` and set
+   `ELSYIA_WAKE_MODEL=~/.elsyia/wakeword/hey_elsyia.onnx` in `backend/.env`.
 4. Restart the backend and flip the toggle — the overlay shows the active
-   phrase. `JEV_WAKE_THRESHOLD` (default 0.5) trades false wakes against
-   missed ones; raise it if Jev wakes up uninvited.
+   phrase. `ELSYIA_WAKE_THRESHOLD` (default 0.5) trades false wakes against
+   missed ones; raise it if Elsyia wakes up uninvited.
 
 **Cost:** roughly 1–3% of one CPU core and ~50 MB RAM while listening; the
 model file is about 1 MB.
@@ -183,7 +183,7 @@ with a faked mic and model — no audio hardware needed.
 
 ### Dictation mode — say it, it types
 
-Press **Ctrl+Shift+D** anywhere on your system and Jev starts recording —
+Press **Ctrl+Shift+D** anywhere on your system and Elsyia starts recording —
 press it again and your words get typed into whichever app was focused:
 Gmail, Docs, Notion, a chat box, a terminal, anywhere. Speaking runs at
 roughly 150 words per minute against ~40 for typing, so this is the
@@ -202,13 +202,13 @@ translated, and nothing is ever added.
 
 **The flow:** hotkey → red recording dot in the overlay (Esc cancels) →
 hotkey again → cleanup → a preview popup shows the cleaned text with
-**Type it / Re-record / Cancel**. Set `JEV_DICTATION_CONFIRM=false` in
+**Type it / Re-record / Cancel**. Set `ELSYIA_DICTATION_CONFIRM=false` in
 `backend/.env` to skip the preview and type immediately. The overlay
 hides itself before typing so your keystrokes land in the right app, and
-the wake-word listener pauses while you dictate so Jev can't hear itself.
+the wake-word listener pauses while you dictate so Elsyia can't hear itself.
 
 Dictation is a separate, silent mode: it types text and never triggers
-Jev's spoken reply loop.
+Elsyia's spoken reply loop.
 
 **Privacy:** everything is on-device — faster-whisper for transcription,
 Ollama for cleanup, pynput for typing. No audio leaves your machine and
@@ -219,49 +219,49 @@ nothing is stored after the turn.
 has `pynput` (`pip install pynput` — it is in the backend dependencies).
 If typing reports unavailable, that is the missing piece.
 
-**Customising:** the hotkey is `JEV_DICTATION_HOTKEY` in `backend/.env`
+**Customising:** the hotkey is `ELSYIA_DICTATION_HOTKEY` in `backend/.env`
 (read by the Electron shell at launch, so set it before starting the
 app). The cleanup prompt lives in `prompts/dictation-cleanup.txt` — edit
 it to change how aggressive the cleanup is.
 
 ---
 
-### Jev's voice — pick the Jarvis voice
+### Elsyia's voice — pick the Jarvis voice
 
-Jev speaks with Piper, a free neural text-to-speech engine that runs
-entirely on your machine. Out of the box Jev uses **en_GB-alan-medium** —
+Elsyia speaks with Piper, a free neural text-to-speech engine that runs
+entirely on your machine. Out of the box Elsyia uses **en_GB-alan-medium** —
 a deep British male voice, chosen because it is the closest free Piper
 voice to the Jarvis/butler archetype (and a natural fit for a butler
-named Jev). If you prefer an American voice, `en_US-ryan-medium` is the
+named Elsyia). If you prefer an American voice, `en_US-ryan-medium` is the
 closest male alternative. Character is subjective, so listen and pick
 your favourite — switching is instant and needs no restart.
 
 **API** (no UI changes — this is all endpoints and config):
 
-- `GET /jev/voice/list` — every known voice: which are downloaded, which
+- `GET /elsyia/voice/list` — every known voice: which are downloaded, which
   can be fetched, and which one is active.
-- `POST /jev/voice/preview` `{"voice_id": "...", "text": "..."}` — hear a
+- `POST /elsyia/voice/preview` `{"voice_id": "...", "text": "..."}` — hear a
   sample line in that voice *without* changing the active one.
-- `POST /jev/voice/download` `{"voice_id": "..."}` — fetch a voice from
-  HuggingFace (streams progress). Explicit only: Jev never downloads
+- `POST /elsyia/voice/download` `{"voice_id": "..."}` — fetch a voice from
+  HuggingFace (streams progress). Explicit only: Elsyia never downloads
   voices on its own.
-- `POST /jev/voice/select` `{"voice_id": "..."}` — make it Jev's voice.
+- `POST /elsyia/voice/select` `{"voice_id": "..."}` — make it Elsyia's voice.
   Takes effect immediately; the choice is remembered in
-  `~/.jev/voice.json`.
+  `~/.elsyia/voice.json`.
 
 Example:
 
 ```bash
-curl -s localhost:8000/api/v1/jev/voice/list | python3 -m json.tool
-curl -X POST localhost:8000/api/v1/jev/voice/download \
+curl -s localhost:8000/api/v1/elsyia/voice/list | python3 -m json.tool
+curl -X POST localhost:8000/api/v1/elsyia/voice/download \
   -H 'Content-Type: application/json' -d '{"voice_id":"en_US-ryan-medium"}'
 # then, after the download finishes:
-curl -X POST localhost:8000/api/v1/jev/voice/select \
+curl -X POST localhost:8000/api/v1/elsyia/voice/select \
   -H 'Content-Type: application/json' -d '{"voice_id":"en_US-ryan-medium"}'
 ```
 
-**Config:** `JEV_TTS_VOICE` in `backend/.env` sets the default voice;
-a persisted choice from `/jev/voice/select` overrides it. The underlying
+**Config:** `ELSYIA_TTS_VOICE` in `backend/.env` sets the default voice;
+a persisted choice from `/elsyia/voice/select` overrides it. The underlying
 provider default is `PIPER_VOICE` (now `en_GB-alan-medium`); downloaded
 voices live in `models/piper/`. The full catalogue of downloadable
 voices is at <https://huggingface.co/rhasspy/piper-voices> — any voice id
@@ -271,18 +271,18 @@ in Piper's `lang_REGION-name-quality` shape can be fetched.
 
 ### Agent mode — say it and it's done
 
-Open the Jev overlay and expand **▸ Agent mode**. Type one command that
-needs several things to happen, and Jev plans and runs the whole chain:
+Open the Elsyia overlay and expand **▸ Agent mode**. Type one command that
+needs several things to happen, and Elsyia plans and runs the whole chain:
 
 > "grab my flight info from Gmail, put it on my calendar, and text Mom the details"
 
 Behind that sentence: your local Ollama model breaks the command into an
-ordered plan against Jev's real tool list (never invented tools), then
+ordered plan against Elsyia's real tool list (never invented tools), then
 runs it step by step — search Gmail → read the flight email → create the
 calendar event → open WhatsApp with the message prefilled. Outputs are
 threaded forward, so the flight details found in step 2 become the
 calendar event and the WhatsApp text. Each step narrates itself in the
-overlay ("Finding your flight email… ✓"), and Jev speaks a summary at
+overlay ("Finding your flight email… ✓"), and Elsyia speaks a summary at
 the end.
 
 A few more things it handles:
@@ -299,8 +299,8 @@ A few more things it handles:
   outside world — sending an email, creating a calendar event — pauses
   the plan and waits for your tap (or "yes") before continuing. The rest
   of the plan resumes exactly where it stopped.
-- **At most 5 steps** per plan (`JEV_AGENT_MAX_STEPS`), each with its own
-  timeout (`JEV_AGENT_STEP_TIMEOUT_S`, 60 seconds default).
+- **At most 5 steps** per plan (`ELSYIA_AGENT_MAX_STEPS`), each with its own
+  timeout (`ELSYIA_AGENT_STEP_TIMEOUT_S`, 60 seconds default).
 - **Failure is honest.** If step 2 of 4 fails, the plan stops, keeps the
   partial results, and tells you exactly what succeeded and where it got
   stuck. Nothing is silently skipped.
@@ -312,9 +312,9 @@ send yourself. LinkedIn opens deep links; it can't post. And the planner
 is only as clever as your local model — if it can't break a command
 down, it says so instead of guessing.
 
-Developers: `POST /jev/agent` (add `stream: true` for live server-sent
-step events), `POST /jev/agent/{plan_id}/confirm` to resume after a
-confirmation pause, `GET /jev/agent/status` for health. The planner
+Developers: `POST /elsyia/agent` (add `stream: true` for live server-sent
+step events), `POST /elsyia/agent/{plan_id}/confirm` to resume after a
+confirmation pause, `GET /elsyia/agent/status` for health. The planner
 prompt lives in `prompts/agent-planner.txt`.
 
 ---
@@ -323,13 +323,13 @@ prompt lives in `prompts/agent-planner.txt`.
 
 Press **Ctrl+Shift+S**. Your screen dims; drag a rectangle around
 whatever has your attention — an error message, a maths problem, a
-paragraph you're stuck on. Release, and Jev shows you the capture and
+paragraph you're stuck on. Release, and Elsyia shows you the capture and
 asks: *"What about it?"* Ask by typing, or hold the mic button (or
 just press Space) and ask by voice:
 
 > "what's this error?" · "solve 2x+7=15" · "reply to this email here"
 
-Jev looks at the region with a small local vision model (**moondream**,
+Elsyia looks at the region with a small local vision model (**moondream**,
 running on your machine through Ollama — nothing leaves your laptop),
 answers in text and out loud, and shows you the capture it worked
 from. If the answer leads somewhere actionable, tap **Do it with agent
@@ -339,12 +339,12 @@ to this email here" can draft and, after the usual confirmation tap,
 actually send the Gmail reply. The planner sees the capture; the
 confirm gate still applies to every outward action.
 
-**The privacy promise, plainly:** Jev only looks when you ask. The
+**The privacy promise, plainly:** Elsyia only looks when you ask. The
 screen capture happens only when you press the hotkey and draw a
 region — never in the background, never continuous watching, never a
 full screenshot. The capture lives only in memory, is never written to
-disk, and expires on its own after 5 minutes (`JEV_SEE_CAPTURE_TTL_S`).
-The region-select window says it on the tin: *"Jev only looks when
+disk, and expires on its own after 5 minutes (`ELSYIA_SEE_CAPTURE_TTL_S`).
+The region-select window says it on the tin: *"Elsyia only looks when
 you ask."*
 
 One-time setup on your laptop:
@@ -354,23 +354,23 @@ ollama pull moondream
 ```
 
 That's the only new download — about 1.7 GB, free, local. If the model
-isn't pulled yet, Jev tells you exactly which command to run instead
+isn't pulled yet, Elsyia tells you exactly which command to run instead
 of guessing.
 
-Developers: `POST /jev/see/capture` (multipart PNG; only called after
-the explicit region select), `POST /jev/see` (question → answer +
-timings), `GET /jev/see/status` (vision model availability). Settings:
-`JEV_SEE_HOTKEY` (default `CommandOrControl+Shift+S`), `JEV_SEE_MODEL`
-(default `moondream`), `JEV_SEE_CAPTURE_TTL_S` (default `300`).
+Developers: `POST /elsyia/see/capture` (multipart PNG; only called after
+the explicit region select), `POST /elsyia/see` (question → answer +
+timings), `GET /elsyia/see/status` (vision model availability). Settings:
+`ELSYIA_SEE_HOTKEY` (default `CommandOrControl+Shift+S`), `ELSYIA_SEE_MODEL`
+(default `moondream`), `ELSYIA_SEE_CAPTURE_TTL_S` (default `300`).
 
 ---
 
 ### MCP — build your own integrations
 
 The Model Context Protocol is an open standard for giving AI assistants
-tools. Instead of Jev hand-writing every integration, it acts as an MCP
-*client*: any community MCP server you list in `~/.jev/mcp.json` gets
-connected at startup, and its tools appear in Jev as
+tools. Instead of Elsyia hand-writing every integration, it acts as an MCP
+*client*: any community MCP server you list in `~/.elsyia/mcp.json` gets
+connected at startup, and its tools appear in Elsyia as
 `mcp.<server>.<tool>` — usable from plain chat and from agent-mode
 plans, with outputs threading between steps like any built-in tool.
 
@@ -383,13 +383,13 @@ pip install mcp-server-fetch         # fetch web pages as markdown
 npx -y @modelcontextprotocol/server-filesystem  # local file tools (no install; npx fetches it)
 
 # 2. Copy the example config and enable what you want:
-cp docs/mcp.example.json ~/.jev/mcp.json
-# then edit ~/.jev/mcp.json — set "enabled": true on your servers
+cp docs/mcp.example.json ~/.elsyia/mcp.json
+# then edit ~/.elsyia/mcp.json — set "enabled": true on your servers
 
-# 3. Restart the backend (or POST /jev/mcp/refresh — no restart needed)
+# 3. Restart the backend (or POST /elsyia/mcp/refresh — no restart needed)
 ```
 
-Then say *"list my MCP servers"* — or check `GET /jev/mcp/status` for
+Then say *"list my MCP servers"* — or check `GET /elsyia/mcp/status` for
 per-server availability, tool counts, and errors.
 
 **Confirmation policy.** MCP tools follow the same gate as built-ins:
@@ -400,13 +400,13 @@ you fully trust; not recommended).
 
 **Security, plainly stated:**
 
-- Only servers listed in `~/.jev/mcp.json` ever run. That file is the
-  trust boundary — Jev never downloads, installs, or launches an MCP
+- Only servers listed in `~/.elsyia/mcp.json` ever run. That file is the
+  trust boundary — Elsyia never downloads, installs, or launches an MCP
   server on its own, and never adds entries to the file itself.
-- A dead or hostile server can't break Jev: connections happen in the
+- A dead or hostile server can't break Elsyia: connections happen in the
   background, failures mark the server unavailable, and everything else
   keeps working.
-- A remote (SSE) server sees every argument you send it. Only point Jev
+- A remote (SSE) server sees every argument you send it. Only point Elsyia
   at servers you trust, especially remote ones.
 - MCP tools never bypass the confirmation gate — there is no silent
   path around it.
@@ -417,15 +417,15 @@ command — give your servers clear `"description"`-friendly names. The
 fetch server needs outbound network access; on restricted machines it
 will list its tools fine but fetches may fail.
 
-Developers: `GET /jev/mcp/status`, `POST /jev/mcp/refresh`,
-`GET /jev/status` (includes an `mcp` summary). The client lives in
-`backend/app/services/jev/mcp_client.py`.
+Developers: `GET /elsyia/mcp/status`, `POST /elsyia/mcp/refresh`,
+`GET /elsyia/status` (includes an `mcp` summary). The client lives in
+`backend/app/services/elsyia/mcp_client.py`.
 
 ---
 
 ## 💻 Desktop app — install it, don't build it
 
-Jev ships as a real desktop app: double-click the installer and it just
+Elsyia ships as a real desktop app: double-click the installer and it just
 works. No terminal, no `npm run`, no manually starting the Python
 backend — the installer bundles the frozen backend and the Electron
 shell, which starts everything for you.
@@ -471,8 +471,8 @@ The release workflow above handles this for you.
   app-data dir (Whisper → HuggingFace cache, Piper → `models/piper`,
   wake-word → openWakeWord cache). The installer stays small.
 - Your data (databases, notes, OAuth tokens, settings) lives in the
-  OS app-data dir (`~/.config/Jev` on Linux,
-  `%APPDATA%/Jev` on Windows, `~/Library/Application Support/Jev` on macOS).
+  OS app-data dir (`~/.config/Elsyia` on Linux,
+  `%APPDATA%/Elsyia` on Windows, `~/Library/Application Support/Elsyia` on macOS).
 
 ### Honest notes
 
@@ -482,7 +482,7 @@ The release workflow above handles this for you.
   unsigned apps.
 - The backend is a single-file executable that unpacks on each launch;
   if `/tmp` is tiny, set `TMPDIR` to a roomier directory.
-- System tray: Show/Hide Jev, wake-word toggle, start-at-login, Quit.
+- System tray: Show/Hide Elsyia, wake-word toggle, start-at-login, Quit.
 
 ## 🚀 Tech Stack
 
@@ -582,8 +582,8 @@ Elysia's UI draws inspiration from:
 
 ## 🛠 Installation
 
-> **Note:** Elysia is under active development. Jev (the voice assistant)
-> is the working centrepiece — see the Jev section above.
+> **Note:** Elysia is under active development. Elsyia (the voice assistant)
+> is the working centrepiece — see the Elsyia section above.
 
 ### Prerequisites
 - **Node.js** 18+
@@ -623,11 +623,11 @@ npm run electron:dev
 # Backend health
 curl http://127.0.0.1:8000/health
 
-# Jev loop health: STT, LLM, TTS, Gmail/Calendar state
-curl http://127.0.0.1:8000/api/v1/jev/status
+# Elsyia loop health: STT, LLM, TTS, Gmail/Calendar state
+curl http://127.0.0.1:8000/api/v1/elsyia/status
 
-# One text turn through Jev (no audio needed)
-curl -X POST http://127.0.0.1:8000/api/v1/jev/ask \
+# One text turn through Elsyia (no audio needed)
+curl -X POST http://127.0.0.1:8000/api/v1/elsyia/ask \
   -H 'Content-Type: application/json' \
   -d '{"message":"what time is it"}'
 

@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Jev — your local voice assistant (Elysia)",
+  "description": "Elsyia — your local voice assistant (Elysia)",
   "author": "Aarya Patel <aaryapatel1807@gmail.com>",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -41,8 +41,8 @@
     "wait-on": "^8.0.0"
   },
   "build": {
-    "appId": "com.aaryapatel.jev",
-    "productName": "Jev",
+    "appId": "com.aaryapatel.elsyia",
+    "productName": "Elsyia",
     "directories": {
       "buildResources": "build-resources",
       "output": "release"
@@ -84,7 +84,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Jev",
+      "shortcutName": "Elsyia",
       "artifactName": "${productName} Setup ${version}.${ext}"
     },
     "mac": {
@@ -100,7 +100,7 @@
       "target": ["AppImage"],
       "icon": "build-resources/icons",
       "category": "Utility",
-      "description": "Jev — your local voice assistant"
+      "description": "Elsyia — your local voice assistant"
     }
   }
 }

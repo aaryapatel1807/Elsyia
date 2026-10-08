@@ -1,4 +1,4 @@
-"""Background memory consolidation for Jev: turn conversations into durable facts.
+"""Background memory consolidation for Elsyia: turn conversations into durable facts.
 
 Pattern (after mem0, adapted for local-first):
   1. EXTRACT — one LLM call pulls candidate durable facts from a turn
@@ -8,12 +8,12 @@ Pattern (after mem0, adapted for local-first):
      get a small LLM ADD-vs-UPDATE decision; contradictions surface as
      UPDATE.
   3. SAVE — survivors are stored with source="observed" and approved=False,
-     so they wait in the pending-review queue Jev already has. Nothing is
+     so they wait in the pending-review queue Elsyia already has. Nothing is
      auto-trusted.
 
 Everything here is best-effort and exception-safe: consolidation must
-never break or slow a voice turn. The Jev loop fires it as a background
-task guarded by the JEV_MEMORY_CONSOLIDATE setting.
+never break or slow a voice turn. The Elsyia loop fires it as a background
+task guarded by the ELSYIA_MEMORY_CONSOLIDATE setting.
 """
 
 from __future__ import annotations
@@ -199,7 +199,7 @@ async def maybe_consolidate(
     """Best-effort entry point for the voice loop. Never raises."""
     try:
         settings = get_settings()
-        if not getattr(settings, "JEV_MEMORY_CONSOLIDATE", True):
+        if not getattr(settings, "ELSYIA_MEMORY_CONSOLIDATE", True):
             return
         if len((user_text or "").strip()) < 20:
             return

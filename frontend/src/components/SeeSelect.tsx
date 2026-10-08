@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * [jev-see] Screen-aware region select — the snipping-tool interaction.
+ * [elsyia-see] Screen-aware region select — the snipping-tool interaction.
  *
  * Fullscreen transparent window: drag a rectangle, release to capture,
- * Esc cancels (no capture happens). Visual language reuses the Jev
+ * Esc cancels (no capture happens). Visual language reuses the Elsyia
  * overlay exactly: dimmed backdrop, #4f7cff selection border (the
  * listening-orb blue), small-caps hint microcopy.
  *
  * Privacy: this window — opened only by the explicit Ctrl+Shift+S
- * hotkey — is the ONLY path that leads to a screen capture in Jev.
- * (window.elysia is typed once in JevOverlay.tsx.)
+ * hotkey — is the ONLY path that leads to a screen capture in Elsyia.
+ * (window.elysia is typed once in ElsyiaOverlay.tsx.)
  */
 
 interface Rect {
@@ -113,7 +113,7 @@ export default function SeeSelect() {
           pointerEvents: "none",
         }}
       >
-        Jev only looks when you ask.
+        Elsyia only looks when you ask.
       </div>
       {rect && rect.w > 0 && rect.h > 0 && (
         <div

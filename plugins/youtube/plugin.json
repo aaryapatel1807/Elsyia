@@ -1,8 +1,8 @@
 {
-  "id": "jev-youtube",
-  "name": "Jev YouTube",
+  "id": "elsyia-youtube",
+  "name": "Elsyia YouTube",
   "version": "1.0.0",
-  "description": "Voice control for YouTube: 'Jev, play X on YouTube'. Resolves the exact video with the free YouTube Data API when a key is configured, otherwise opens YouTube search. Playback control via system media keys.",
+  "description": "Voice control for YouTube: 'Elsyia, play X on YouTube'. Resolves the exact video with the free YouTube Data API when a key is configured, otherwise opens YouTube search. Playback control via system media keys.",
   "entrypoint": "backend/app/services/tools/integrations/media.py:PlayYouTubeTool",
   "tools": ["play_youtube", "media_control"],
   "voice_triggers": ["play {query} on youtube", "pause", "next song", "previous"],

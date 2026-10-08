@@ -1,13 +1,13 @@
-"""Generic Google OAuth2 desktop-app flow for Jev integrations.
+"""Generic Google OAuth2 desktop-app flow for Elsyia integrations.
 
 How it works for Aarya (documented in the README):
 1. He creates his own OAuth client once in Google Cloud Console
    (Desktop app type) — nothing is created for him.
-2. He sets JEV_GOOGLE_CLIENT_JSON to the downloaded client JSON
-   (or JEV_GOOGLE_CLIENT_ID / JEV_GOOGLE_CLIENT_SECRET).
-3. On first use he says "Jev, connect Gmail" — Jev opens Google's
+2. He sets ELSYIA_GOOGLE_CLIENT_JSON to the downloaded client JSON
+   (or ELSYIA_GOOGLE_CLIENT_ID / ELSYIA_GOOGLE_CLIENT_SECRET).
+3. On first use he says "Elsyia, connect Gmail" — Elsyia opens Google's
    consent page in his browser; Google redirects back to a local
-   callback and the token is stored at ~/.jev/ for future runs.
+   callback and the token is stored at ~/.elsyia/ for future runs.
 
 No Google credentials ever live in the repo. Tokens are per-service so
 Gmail and Calendar authorise independently.
@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from app.core import get_logger, get_settings
-from app.services.jev.paths import jev_file
+from app.services.elsyia.paths import elsyia_file
 from app.services.tools.base import ToolError
 
 logger = get_logger(__name__)
@@ -29,16 +29,16 @@ logger = get_logger(__name__)
 
 def _load_client_config() -> dict:
     settings = get_settings()
-    json_path = getattr(settings, "JEV_GOOGLE_CLIENT_JSON", "") or ""
+    json_path = getattr(settings, "ELSYIA_GOOGLE_CLIENT_JSON", "") or ""
     if json_path:
         try:
             return json.loads(_read(json_path))
         except OSError as exc:
             raise ToolError(
-                f"Could not read JEV_GOOGLE_CLIENT_JSON at {json_path}: {exc}"
+                f"Could not read ELSYIA_GOOGLE_CLIENT_JSON at {json_path}: {exc}"
             ) from exc
-    client_id = getattr(settings, "JEV_GOOGLE_CLIENT_ID", "") or ""
-    client_secret = getattr(settings, "JEV_GOOGLE_CLIENT_SECRET", "") or ""
+    client_id = getattr(settings, "ELSYIA_GOOGLE_CLIENT_ID", "") or ""
+    client_secret = getattr(settings, "ELSYIA_GOOGLE_CLIENT_SECRET", "") or ""
     if client_id and client_secret:
         return {
             "installed": {
@@ -50,9 +50,9 @@ def _load_client_config() -> dict:
             }
         }
     raise ToolError(
-        "Google OAuth is not configured. Set JEV_GOOGLE_CLIENT_JSON to your "
-        "OAuth client JSON (Desktop app), or JEV_GOOGLE_CLIENT_ID and "
-        "JEV_GOOGLE_CLIENT_SECRET. See the README for the one-time setup."
+        "Google OAuth is not configured. Set ELSYIA_GOOGLE_CLIENT_JSON to your "
+        "OAuth client JSON (Desktop app), or ELSYIA_GOOGLE_CLIENT_ID and "
+        "ELSYIA_GOOGLE_CLIENT_SECRET. See the README for the one-time setup."
     )
 
 
@@ -71,7 +71,7 @@ class GoogleOAuth:
 
     @property
     def token_path(self):
-        return jev_file(f"google_token_{self.service}.json")
+        return elsyia_file(f"google_token_{self.service}.json")
 
     def _load_credentials(self):
         from google.oauth2.credentials import Credentials

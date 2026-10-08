@@ -1,18 +1,18 @@
 /**
- * backend-launcher.ts — spawns and supervises the Jev backend (FastAPI).
+ * backend-launcher.ts — spawns and supervises the Elsyia backend (FastAPI).
  *
- * Production (packaged app): the PyInstaller-frozen `jev-backend` binary
+ * Production (packaged app): the PyInstaller-frozen `elsyia-backend` binary
  * ships inside <resources>/backend/ and is spawned on app start with:
  *   - a free loopback port (passed as PORT)
- *   - JEV_USER_DATA pointing at the user's app-data dir (all SQLite DBs,
+ *   - ELSYIA_USER_DATA pointing at the user's app-data dir (all SQLite DBs,
  *     logs and downloaded models land there, never in the bundle)
  *   - a per-install SECRET_KEY generated once and stored in userData
  * stdout/stderr are piped to <userData>/logs/backend.log. The process is
  * killed when the app quits.
  *
  * Development: untouched — the developer runs uvicorn themselves
- * (default http://127.0.0.1:8000, or JEV_DEV_PORT); we only resolve the
- * URL and expose it to the renderer via process.env.JEV_BACKEND_URL.
+ * (default http://127.0.0.1:8000, or ELSYIA_DEV_PORT); we only resolve the
+ * URL and expose it to the renderer via process.env.ELSYIA_BACKEND_URL.
  */
 import { app, dialog } from "electron";
 import { spawn } from "node:child_process";
@@ -31,7 +31,7 @@ export function getBackendUrl() {
 }
 /** Where the frozen backend binary lives in the packaged app. */
 export function backendBinaryPath() {
-    const exe = process.platform === "win32" ? "jev-backend.exe" : "jev-backend";
+    const exe = process.platform === "win32" ? "elsyia-backend.exe" : "elsyia-backend";
     return path.join(process.resourcesPath, "backend", exe);
 }
 /** Where the openWakeWord model ships in the packaged app. */
@@ -100,20 +100,20 @@ function tailLog(file, lines) {
 }
 /**
  * Start the backend (production) or resolve the dev URL.
- * Resolves to the backend base URL and sets process.env.JEV_BACKEND_URL
+ * Resolves to the backend base URL and sets process.env.ELSYIA_BACKEND_URL
  * BEFORE any window is created, so the preload bridge can expose it.
  */
 export async function startBackend() {
     if (isDev) {
-        const port = Number.parseInt(process.env.JEV_DEV_PORT ?? "8000", 10) || 8000;
+        const port = Number.parseInt(process.env.ELSYIA_DEV_PORT ?? "8000", 10) || 8000;
         backendUrl = `http://127.0.0.1:${port}`;
-        process.env.JEV_BACKEND_URL = backendUrl;
-        console.log(`[Jev] dev mode — expecting backend at ${backendUrl} (start it with uvicorn)`);
+        process.env.ELSYIA_BACKEND_URL = backendUrl;
+        console.log(`[Elsyia] dev mode — expecting backend at ${backendUrl} (start it with uvicorn)`);
         return backendUrl;
     }
     const port = await findFreePort();
     backendUrl = `http://127.0.0.1:${port}`;
-    process.env.JEV_BACKEND_URL = backendUrl;
+    process.env.ELSYIA_BACKEND_URL = backendUrl;
     const userData = app.getPath("userData");
     const logsDir = path.join(userData, "logs");
     fs.mkdirSync(logsDir, { recursive: true });
@@ -122,14 +122,14 @@ export async function startBackend() {
     if (!fs.existsSync(bin)) {
         throw new Error(`Backend binary not found at ${bin}. The installer was built without 'npm run build:backend'.`);
     }
-    console.log(`[Jev] spawning backend: ${bin} on port ${port}`);
+    console.log(`[Elsyia] spawning backend: ${bin} on port ${port}`);
     backendProc = spawn(bin, [], {
         env: {
             ...process.env,
             HOST: "127.0.0.1",
             PORT: String(port),
             DEBUG: "false",
-            JEV_USER_DATA: userData,
+            ELSYIA_USER_DATA: userData,
             SECRET_KEY: ensureSecret(),
         },
         cwd: userData,
@@ -140,10 +140,10 @@ export async function startBackend() {
     backendProc.stdout?.on("data", (d) => logStream.write(`[out] ${d}`));
     backendProc.stderr?.on("data", (d) => logStream.write(`[err] ${d}`));
     backendProc.on("error", (err) => {
-        console.error(`[Jev] backend process error: ${err.message}`);
+        console.error(`[Elsyia] backend process error: ${err.message}`);
     });
     backendProc.on("exit", (code, signal) => {
-        console.error(`[Jev] backend exited (code=${code}, signal=${signal})`);
+        console.error(`[Elsyia] backend exited (code=${code}, signal=${signal})`);
         backendProc = null;
     });
     try {
@@ -158,10 +158,10 @@ export async function startBackend() {
             /* already dead */
         }
         backendProc = null;
-        dialog.showErrorBox("Jev backend failed to start", `${err instanceof Error ? err.message : String(err)}\n\nLast backend log output:\n${excerpt}\n\nFull log: ${logFile}`);
+        dialog.showErrorBox("Elsyia backend failed to start", `${err instanceof Error ? err.message : String(err)}\n\nLast backend log output:\n${excerpt}\n\nFull log: ${logFile}`);
         throw err;
     }
-    console.log(`[Jev] backend healthy at ${backendUrl}`);
+    console.log(`[Elsyia] backend healthy at ${backendUrl}`);
     return backendUrl;
 }
 /** Kill the backend child process (called on app quit). */

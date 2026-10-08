@@ -1,9 +1,9 @@
-"""Jev dictation mode: say it, it types.
+"""Elsyia dictation mode: say it, it types.
 
 A separate mode from the assistant loop — dictation types text into the
-currently focused application and stays silent. It never triggers Jev's
+currently focused application and stays silent. It never triggers Elsyia's
 spoken replies, and the caller is expected to pause the wake-word listener
-while dictating so Jev can't hear itself.
+while dictating so Elsyia can't hear itself.
 
 Pipeline: mic audio -> Whisper STT -> Ollama "instant cleanup" pass ->
 pynput keyboard injection (typed, not pasted, so it works in every app:
@@ -21,7 +21,7 @@ from typing import Any
 
 from app.core import get_logger, get_settings
 
-logger = get_logger("jev.dictation")
+logger = get_logger("elsyia.dictation")
 
 
 class DictationUnavailable(Exception):
@@ -47,7 +47,7 @@ Transcript:
 def load_cleanup_prompt() -> str:
     """Load the cleanup prompt from prompts/, falling back to the embedded copy."""
     here = Path(__file__).resolve()
-    # backend/app/services/jev/dictation.py -> repo root is 4 levels up
+    # backend/app/services/elsyia/dictation.py -> repo root is 4 levels up
     candidates = [
         here.parents[4] / "prompts" / "dictation-cleanup.txt",
         Path.cwd() / "prompts" / "dictation-cleanup.txt",
@@ -132,8 +132,8 @@ def dictation_status() -> dict[str, Any]:
     """Capability report for the dictation settings UI."""
     settings = get_settings()
     return {
-        "hotkey": settings.JEV_DICTATION_HOTKEY,
-        "confirm": settings.JEV_DICTATION_CONFIRM,
+        "hotkey": settings.ELSYIA_DICTATION_HOTKEY,
+        "confirm": settings.ELSYIA_DICTATION_CONFIRM,
         "typing_available": _pynput_available(),
         "on_device": True,
     }

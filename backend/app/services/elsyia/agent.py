@@ -1,4 +1,4 @@
-"""Jev agent mode: "say it and it's done".
+"""Elsyia agent mode: "say it and it's done".
 
 Multi-step chaining on top of the deterministic single-intent fast path.
 A command like "grab my flight info from Gmail, put it on my calendar,
@@ -19,7 +19,7 @@ Design notes:
 - On any step failure: stop, keep partial results, report exactly what
   succeeded and what didn't. Never silently skip.
 - Plans live in an in-memory store (15-minute TTL) so a plan can pause
-  for confirmation and resume via POST /jev/agent/{plan_id}/confirm.
+  for confirmation and resume via POST /elsyia/agent/{plan_id}/confirm.
 - Everything is local: Ollama plans, local tools execute. No cloud.
 """
 
@@ -35,12 +35,12 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from app.core import get_logger, get_settings
-from app.services.jev.loop import _describe_tool_result
+from app.services.elsyia.loop import _describe_tool_result
 from app.services.llm.factory import get_llm_provider
 from app.services.tools.intent import route_intent
 from app.services.tools.registry import registry
 
-logger = get_logger("jev.agent")
+logger = get_logger("elsyia.agent")
 
 _PLAN_TTL_S = 15 * 60
 
@@ -110,7 +110,7 @@ _ARG_HINTS: dict[str, str] = {
     "launch_application": '{"application": "<app name>"}',
 }
 
-_DEFAULT_PLANNER_PROMPT = """You are Jev's action planner. Break the command into tool steps.
+_DEFAULT_PLANNER_PROMPT = """You are Elsyia's action planner. Break the command into tool steps.
 TOOLS:
 {tool_manifest}
 RULES: output STRICT JSON {"steps": [{"tool": "<name>", "args": {}, "say": "<narration>"}]} and nothing else.
@@ -185,7 +185,7 @@ def _parse_plan_json(raw: str, max_steps: int) -> list[dict[str, Any]]:
 async def plan_with_llm(text: str, settings: Any | None = None) -> list[dict[str, Any]]:
     """Ask the local Ollama planner to decompose text into validated steps."""
     settings = settings or get_settings()
-    max_steps = settings.JEV_AGENT_MAX_STEPS
+    max_steps = settings.ELSYIA_AGENT_MAX_STEPS
     provider = get_llm_provider(settings.DEFAULT_LLM_PROVIDER)
     prompt = (
         load_planner_prompt()
@@ -354,8 +354,8 @@ class AgentRunner:
             "enabled": True,
             "planner_ready": self.planner_ready(),
             "planner_model": settings.DEFAULT_LLM_MODEL,
-            "max_steps": settings.JEV_AGENT_MAX_STEPS,
-            "step_timeout_s": settings.JEV_AGENT_STEP_TIMEOUT_S,
+            "max_steps": settings.ELSYIA_AGENT_MAX_STEPS,
+            "step_timeout_s": settings.ELSYIA_AGENT_STEP_TIMEOUT_S,
             "active_plans": self.active_plans(),
         }
 
@@ -388,7 +388,7 @@ class AgentRunner:
             provider = get_llm_provider(settings.DEFAULT_LLM_PROVIDER)
             prompt = strict.replace(
                 "{tool_manifest}", build_tool_manifest()
-            ).replace("{max_steps}", str(settings.JEV_AGENT_MAX_STEPS)).replace(
+            ).replace("{max_steps}", str(settings.ELSYIA_AGENT_MAX_STEPS)).replace(
                 "{utterance}", text.strip()
             )
             try:
@@ -399,7 +399,7 @@ class AgentRunner:
                 ):
                     chunks.append(chunk)
                 raw_steps = _parse_plan_json(
-                    "".join(chunks).strip(), settings.JEV_AGENT_MAX_STEPS
+                    "".join(chunks).strip(), settings.ELSYIA_AGENT_MAX_STEPS
                 )
             except Exception as exc:  # noqa: BLE001 — retry is best-effort
                 logger.debug("Agent planner retry failed: %s", exc)
@@ -445,12 +445,12 @@ class AgentRunner:
                         step.tool, args,
                         confirmed=step.tool in plan.confirmed,
                     ),
-                    timeout=settings.JEV_AGENT_STEP_TIMEOUT_S,
+                    timeout=settings.ELSYIA_AGENT_STEP_TIMEOUT_S,
                 )
             except asyncio.TimeoutError:
                 step.status = "failed"
                 step.error = (
-                    f"Timed out after {settings.JEV_AGENT_STEP_TIMEOUT_S}s."
+                    f"Timed out after {settings.ELSYIA_AGENT_STEP_TIMEOUT_S}s."
                 )
                 plan.status = "failed"
                 self._skip_rest(plan, step.seq)
@@ -471,7 +471,7 @@ class AgentRunner:
                             step.tool, args,
                             confirmed=step.tool in plan.confirmed,
                         ),
-                        timeout=settings.JEV_AGENT_STEP_TIMEOUT_S,
+                        timeout=settings.ELSYIA_AGENT_STEP_TIMEOUT_S,
                     )
                 except Exception as retry_exc:  # noqa: BLE001
                     step.status = "failed"

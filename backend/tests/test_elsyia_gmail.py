@@ -7,8 +7,8 @@ import base64
 
 import pytest
 
-import app.services.jev.gmail as gmail_module
-from app.services.jev.gmail import GmailClient, _extract_plain_text
+import app.services.elsyia.gmail as gmail_module
+from app.services.elsyia.gmail import GmailClient, _extract_plain_text
 from app.services.tools.base import ToolError
 
 

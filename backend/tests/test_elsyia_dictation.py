@@ -1,4 +1,4 @@
-"""Tests for Jev dictation mode (say it, it types).
+"""Tests for Elsyia dictation mode (say it, it types).
 
 The LLM, the microphone, and pynput are all faked — no network, no audio
 hardware, no keystrokes leave the test process. The cleanup prompt, the
@@ -9,8 +9,8 @@ import sys
 
 import pytest
 
-from app.services.jev import dictation
-from app.services.jev.dictation import (
+from app.services.elsyia import dictation
+from app.services.elsyia.dictation import (
     DictationUnavailable,
     cleanup_transcript,
     dictation_status,

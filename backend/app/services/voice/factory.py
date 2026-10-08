@@ -11,7 +11,7 @@ from app.core import ConfigurationError, get_logger, get_settings
 from app.services.voice.base import STTProvider, TTSProvider
 from app.services.voice.piper_tts import PiperTTSProvider
 from app.services.voice.whisper_stt import WhisperSTTProvider
-from app.services.jev.voice_picker import resolve_active_voice
+from app.services.elsyia.voice_picker import resolve_active_voice
 
 logger = get_logger("voice.factory")
 

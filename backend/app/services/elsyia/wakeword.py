@@ -1,10 +1,10 @@
-"""Jev wake-word listener: hands-free summoning ("hey Jev").
+"""Elsyia wake-word listener: hands-free summoning ("hey Elsyia").
 
 A tiny always-on keyword spotter (openWakeWord, local ONNX inference) that
 idles on the microphone watching ONLY for the wake phrase. On detection it
-raises a wake event, pauses itself for a cooldown (so Jev's own spoken
-reply can't re-trigger it), and the Electron shell summons the Jev overlay
-and starts the normal /jev/turn voice loop. When the turn finishes, the
+raises a wake event, pauses itself for a cooldown (so Elsyia's own spoken
+reply can't re-trigger it), and the Electron shell summons the Elsyia overlay
+and starts the normal /elsyia/turn voice loop. When the turn finishes, the
 overlay resumes the listener and it goes back to sleep.
 
 Privacy: no audio ever leaves the machine. The mic stream is scored
@@ -12,7 +12,7 @@ on-device in 80 ms frames and discarded immediately; nothing is recorded,
 stored, or transmitted.
 
 The listener is OFF by default and only runs after an explicit opt-in
-(the overlay's wake-word toggle or JEV_WAKE_ENABLED=true).
+(the overlay's wake-word toggle or ELSYIA_WAKE_ENABLED=true).
 """
 
 from __future__ import annotations
@@ -25,9 +25,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.core import get_logger, get_settings
-from app.services.jev.paths import jev_data_dir
+from app.services.elsyia.paths import elsyia_data_dir
 
-logger = get_logger("jev.wakeword")
+logger = get_logger("elsyia.wakeword")
 
 SAMPLE_RATE = 16_000
 CHUNK_SAMPLES = 1280  # 80 ms frames — openWakeWord's native frame size
@@ -50,16 +50,16 @@ class WakeWordConfig:
     def from_settings(cls) -> "WakeWordConfig":
         settings = get_settings()
         return cls(
-            enabled=bool(getattr(settings, "JEV_WAKE_ENABLED", False)),
-            model=str(getattr(settings, "JEV_WAKE_MODEL", DEFAULT_MODEL_NAME) or DEFAULT_MODEL_NAME),
-            threshold=float(getattr(settings, "JEV_WAKE_THRESHOLD", 0.5)),
-            cooldown_s=int(getattr(settings, "JEV_WAKE_COOLDOWN_S", 45)),
+            enabled=bool(getattr(settings, "ELSYIA_WAKE_ENABLED", False)),
+            model=str(getattr(settings, "ELSYIA_WAKE_MODEL", DEFAULT_MODEL_NAME) or DEFAULT_MODEL_NAME),
+            threshold=float(getattr(settings, "ELSYIA_WAKE_THRESHOLD", 0.5)),
+            cooldown_s=int(getattr(settings, "ELSYIA_WAKE_COOLDOWN_S", 45)),
         )
 
 
 def wakeword_models_dir() -> Path:
-    """Directory for custom wake-word models (e.g. a trained hey_jev.onnx)."""
-    path = jev_data_dir() / "wakeword"
+    """Directory for custom wake-word models (e.g. a trained hey_elsyia.onnx)."""
+    path = elsyia_data_dir() / "wakeword"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -173,7 +173,7 @@ class WakeWordService:
         self._on_wake = on_wake
         self._capture_factory = capture_factory or _MicCapture
         self._model_factory = model_factory or _default_model_factory
-        self._state_path = state_path or (jev_data_dir() / STATE_FILE)
+        self._state_path = state_path or (elsyia_data_dir() / STATE_FILE)
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -241,7 +241,7 @@ class WakeWordService:
         return self.status()
 
     def pause(self) -> None:
-        """Suspend scoring (e.g. while a Jev turn is running)."""
+        """Suspend scoring (e.g. while a Elsyia turn is running)."""
         with self._lock:
             self._paused = True
 
@@ -290,7 +290,7 @@ class WakeWordService:
         self._stop.clear()
         self._paused = False
         self._thread = threading.Thread(
-            target=self._run, name="jev-wakeword", daemon=True
+            target=self._run, name="elsyia-wakeword", daemon=True
         )
         self._thread.start()
         logger.info("Wake-word listener started (model=%s)", self._model_name)

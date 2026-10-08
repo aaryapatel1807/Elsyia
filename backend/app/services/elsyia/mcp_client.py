@@ -1,22 +1,22 @@
-"""Jev MCP client: "build your own with MCP" extensibility.
+"""Elsyia MCP client: "build your own with MCP" extensibility.
 
 The Model Context Protocol lets community-built servers expose tools
 (filesystem, fetch, databases, Notion, Slack, …) over a standard
-interface. Jev acts as an MCP *client*: servers the user lists in
-``~/.jev/mcp.json`` are connected at backend startup (stdio or SSE
-transports), and each server's tools are bridged into Jev's own tool
+interface. Elsyia acts as an MCP *client*: servers the user lists in
+``~/.elsyia/mcp.json`` are connected at backend startup (stdio or SSE
+transports), and each server's tools are bridged into Elsyia's own tool
 registry as ``mcp.<server>.<tool>`` — visible to the agent-mode planner
 and callable by the executor with output threading, exactly like
 built-in tools.
 
-Resilience rules (a community server must never break Jev):
+Resilience rules (a community server must never break Elsyia):
 - Connections happen in a background task at startup; a dead, slow, or
-  misconfigured server is marked unavailable and skipped — Jev keeps
+  misconfigured server is marked unavailable and skipped — Elsyia keeps
   working with whatever is left.
 - Tool calls to an unavailable server re-attempt one connection, then
   fail cleanly with a plain-English error.
 - Only servers listed in the user's own config file ever run. The
-  config file is the trust boundary: Jev never downloads, installs, or
+  config file is the trust boundary: Elsyia never downloads, installs, or
   launches an MCP server on its own.
 
 Confirmation policy: outward-acting MCP tools (anything that writes,
@@ -39,11 +39,11 @@ from pathlib import Path
 from typing import Any
 
 from app.core import get_logger, get_settings
-from app.services.jev.paths import jev_data_dir
+from app.services.elsyia.paths import elsyia_data_dir
 from app.services.tools.base import Tool, ToolError
 from app.services.tools.registry import registry
 
-logger = get_logger("jev.mcp")
+logger = get_logger("elsyia.mcp")
 
 CONFIG_NAME = "mcp.json"
 
@@ -98,7 +98,7 @@ class MCPServerConfig:
 
 def mcp_config_path() -> Path:
     """Path to the user's MCP server config (the trust boundary)."""
-    raw = getattr(get_settings(), "JEV_MCP_CONFIG", "~/.jev/mcp.json")
+    raw = getattr(get_settings(), "ELSYIA_MCP_CONFIG", "~/.elsyia/mcp.json")
     return Path(str(raw)).expanduser()
 
 
@@ -207,7 +207,7 @@ class MCPToolError(ToolError):
 
 
 class MCPTool(Tool):
-    """One MCP server tool, bridged into Jev's registry as mcp.<server>.<tool>."""
+    """One MCP server tool, bridged into Elsyia's registry as mcp.<server>.<tool>."""
 
     def __init__(
         self,
@@ -255,7 +255,7 @@ class MCPManager:
         except RuntimeError:
             logger.warning("No running loop for MCP startup; servers stay lazy.")
             return
-        loop.create_task(self._connect_all(), name="jev-mcp-connect")
+        loop.create_task(self._connect_all(), name="elsyia-mcp-connect")
 
     async def aclose(self) -> None:
         """Close every open MCP session (best-effort)."""
@@ -323,7 +323,7 @@ class MCPManager:
             return False
         try:
             session = await self._open_session(cfg).__aenter__()
-        except Exception as exc:  # noqa: BLE001 - a dead server must not break Jev
+        except Exception as exc:  # noqa: BLE001 - a dead server must not break Elsyia
             self._errors[name] = f"{type(exc).__name__}: {exc}"
             logger.warning("MCP server '%s' unavailable: %s", name, self._errors[name])
             return False
@@ -366,15 +366,15 @@ class MCPManager:
     async def _connect_all(self) -> None:
         """Connect every enabled server; individual failures are contained."""
         self._configs = load_mcp_config()
-        if not getattr(get_settings(), "JEV_MCP_ENABLED", True):
-            logger.info("MCP disabled via JEV_MCP_ENABLED; skipping.")
+        if not getattr(get_settings(), "ELSYIA_MCP_ENABLED", True):
+            logger.info("MCP disabled via ELSYIA_MCP_ENABLED; skipping.")
             return
         for name, cfg in self._configs.items():
             if cfg.enabled:
                 await self._connect_server(name)
 
     async def refresh(self) -> None:
-        """Reconnect everything (used by POST /jev/mcp/refresh)."""
+        """Reconnect everything (used by POST /elsyia/mcp/refresh)."""
         await self.aclose()
         async with self._lock:
             for name in list(self._registered):
@@ -410,7 +410,7 @@ class MCPManager:
     # -- status -------------------------------------------------------
 
     def status(self) -> dict[str, Any]:
-        """Per-server MCP status for GET /jev/mcp/status."""
+        """Per-server MCP status for GET /elsyia/mcp/status."""
         servers: dict[str, Any] = {}
         for name, cfg in self._configs.items():
             servers[name] = {
@@ -422,13 +422,13 @@ class MCPManager:
                 "error": self._errors.get(name),
             }
         return {
-            "enabled": bool(getattr(get_settings(), "JEV_MCP_ENABLED", True)),
+            "enabled": bool(getattr(get_settings(), "ELSYIA_MCP_ENABLED", True)),
             "config": str(mcp_config_path()),
             "servers": servers,
         }
 
     def summary(self) -> dict[str, Any]:
-        """Compact MCP summary for GET /jev/status."""
+        """Compact MCP summary for GET /elsyia/status."""
         st = self.status()
         return {
             "enabled": st["enabled"],

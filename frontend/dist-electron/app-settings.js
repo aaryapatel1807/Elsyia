@@ -6,7 +6,7 @@ import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 function settingsFile() {
-    return path.join(app.getPath("userData"), "jev-settings.json");
+    return path.join(app.getPath("userData"), "elsyia-settings.json");
 }
 function readAll() {
     try {
@@ -28,6 +28,6 @@ export function setSetting(key, value) {
         fs.writeFileSync(settingsFile(), JSON.stringify(all, null, 2));
     }
     catch (err) {
-        console.error(`[Jev] failed to persist setting ${key}:`, err);
+        console.error(`[Elsyia] failed to persist setting ${key}:`, err);
     }
 }

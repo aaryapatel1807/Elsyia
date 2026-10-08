@@ -1,4 +1,4 @@
-"""Tests for Jev screen-aware mode ("circle anything, then just ask").
+"""Tests for Elsyia screen-aware mode ("circle anything, then just ask").
 
 No real screen, no mic, no Ollama here: captures are synthetic PNG
 fixtures and the vision model is faked at the httpx layer.
@@ -16,8 +16,8 @@ from typing import Any
 
 import pytest
 
-from app.services.jev import see as see_module
-from app.services.jev.see import SeeService, SeeUnavailable, get_see_service
+from app.services.elsyia import see as see_module
+from app.services.elsyia.see import SeeService, SeeUnavailable, get_see_service
 from app.services.tools.base import ToolError
 from app.services.tools.see_tools import SeeCaptureTool
 
@@ -201,7 +201,7 @@ def test_see_capture_tool_registered():
 
 
 def test_privacy_invariant_single_write_path():
-    """The ONLY code allowed to store a capture is the /jev/see/capture
+    """The ONLY code allowed to store a capture is the /elsyia/see/capture
     endpoint (called after the user's explicit region select). If this
     fails, someone added a second capture path — reject it."""
     root = Path(__file__).resolve().parents[1]
@@ -211,8 +211,8 @@ def test_privacy_invariant_single_write_path():
         for i, line in enumerate(text.splitlines(), 1):
             if "store_capture(" in line and "def store_capture" not in line:
                 hits.append(f"{path.relative_to(root)}:{i}")
-    assert hits, "no capture write path found — /jev/see/capture must call store_capture"
-    assert all(h.startswith("app/api/v1/jev.py:") for h in hits), (
+    assert hits, "no capture write path found — /elsyia/see/capture must call store_capture"
+    assert all(h.startswith("app/api/v1/elsyia.py:") for h in hits), (
         f"unexpected capture write paths: {hits}"
     )
     # And the tool itself must never write — only read.

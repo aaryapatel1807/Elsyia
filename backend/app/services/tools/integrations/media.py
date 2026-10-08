@@ -8,8 +8,8 @@ from typing import Any
 from urllib.parse import quote_plus
 
 from app.core import get_logger, get_settings
-from app.services.jev.contacts import resolve_contact
-from app.services.jev.open import open_url
+from app.services.elsyia.contacts import resolve_contact
+from app.services.elsyia.open import open_url
 from app.services.tools.base import Tool, ToolError
 
 logger = get_logger(__name__)
@@ -133,7 +133,7 @@ class MessageWhatsAppTool(Tool):
     name = "message_whatsapp"
     description = (
         "Open a WhatsApp chat with prefilled text, ready to send. "
-        "'to' is a name from ~/.jev/contacts.json or a phone number in "
+        "'to' is a name from ~/.elsyia/contacts.json or a phone number in "
         "international format. Opens the chat in WhatsApp Web/desktop — "
         "Aarya taps send himself, which is the honest limit of the free "
         "platform: there is no official API for personal WhatsApp sending."
@@ -177,7 +177,7 @@ class OpenLinkedInTool(Tool):
         "Open LinkedIn: the feed, jobs, a keyword search "
         "('search:data science internships'), or a profile "
         "('profile:aaryapatel'). Posting is not available — LinkedIn only "
-        "offers posting to approved partners, so Jev opens the share "
+        "offers posting to approved partners, so Elsyia opens the share "
         "composer URL instead of faking an API post."
     )
 

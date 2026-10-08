@@ -87,7 +87,7 @@ async def test_morning_briefing_composes():
         "app.services.tools.reminders.ListRemindersTool.run",
         new=AsyncMock(return_value={"reminders": [{"title": "Call mom"}], "count": 1}),
     ), patch(
-        "app.services.jev.calendar.CalendarTodayTool.run",
+        "app.services.elsyia.calendar.CalendarTodayTool.run",
         new=AsyncMock(return_value={"events": [{"title": "Standup", "start": "10:00"}], "count": 1}),
     ):
         result = await MorningBriefingTool().run()
@@ -98,7 +98,7 @@ async def test_morning_briefing_composes():
 
 @pytest.mark.asyncio
 async def test_ask_user_pauses_and_resumes():
-    from app.services.jev.agent import AgentRunner, AgentStep, AgentPlan
+    from app.services.elsyia.agent import AgentRunner, AgentStep, AgentPlan
 
     runner = AgentRunner()
     plan = AgentPlan(plan_id="test123", message="test")

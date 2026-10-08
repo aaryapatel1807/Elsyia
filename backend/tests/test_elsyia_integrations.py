@@ -1,14 +1,14 @@
-"""Tests for Jev's app-integration URL builders and local helpers.
+"""Tests for Elsyia's app-integration URL builders and local helpers.
 
 Browser opening is stubbed — these tests assert the exact deep links
-Jev would open, which is the honest contract of each integration.
+Elsyia would open, which is the honest contract of each integration.
 """
 
 import json
 
 import pytest
 
-from app.services.jev import contacts as contacts_module
+from app.services.elsyia import contacts as contacts_module
 from app.services.tools.base import ToolError
 from app.services.tools.integrations import media as media_module
 from app.services.tools.integrations.media import (
@@ -59,14 +59,14 @@ def test_resolve_contact_digits():
 def test_resolve_contact_book(tmp_path, monkeypatch):
     book = tmp_path / "contacts.json"
     book.write_text(json.dumps({"mom": "+919999999999"}))
-    monkeypatch.setattr(contacts_module, "jev_file", lambda name: book)
+    monkeypatch.setattr(contacts_module, "elsyia_file", lambda name: book)
     assert contacts_module.resolve_contact("mom") == "919999999999"
     assert contacts_module.resolve_contact("MOM") == "919999999999"
 
 
 def test_resolve_contact_unknown_is_helpful(tmp_path, monkeypatch):
     book = tmp_path / "contacts.json"
-    monkeypatch.setattr(contacts_module, "jev_file", lambda name: book)
+    monkeypatch.setattr(contacts_module, "elsyia_file", lambda name: book)
     with pytest.raises(ToolError) as excinfo:
         contacts_module.resolve_contact("nobody")
     assert "contacts.json" in str(excinfo.value)

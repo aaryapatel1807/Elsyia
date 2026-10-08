@@ -134,7 +134,7 @@ class FetchUrlTool(Tool):
             raise ToolError("fetch_url needs a full http(s) URL.")
         async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
             response = await client.get(
-                url, headers={"User-Agent": "jev-assistant/1.0"}
+                url, headers={"User-Agent": "elsyia-assistant/1.0"}
             )
             response.raise_for_status()
             html = response.text

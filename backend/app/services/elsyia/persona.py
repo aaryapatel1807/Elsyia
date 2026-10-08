@@ -1,4 +1,4 @@
-"""Jev persona prompt loading."""
+"""Elsyia persona prompt loading."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
-JEV_NAME = "Jev"
+ELSYIA_NAME = "Elsyia"
 
-_PROMPT_PATH = Path(__file__).resolve().parents[4] / "prompts" / "jev.txt"
+_PROMPT_PATH = Path(__file__).resolve().parents[4] / "prompts" / "elsyia.txt"
 
 
 @lru_cache(maxsize=1)
 def load_persona() -> str:
-    """Load the Jev persona prompt from disk (cached)."""
+    """Load the Elsyia persona prompt from disk (cached)."""
     return _PROMPT_PATH.read_text(encoding="utf-8").strip()
 
 

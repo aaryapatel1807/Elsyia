@@ -46,7 +46,7 @@ _WEB_SEARCH_RE = re.compile(
     re.IGNORECASE,
 )
 
-# --- Jev integration patterns ---
+# --- Elsyia integration patterns ---
 _YOUTUBE_RE = re.compile(r"^play\s+(.+?)\s+on\s+youtube\s*$", re.IGNORECASE)
 _SPOTIFY_PLAY_RE = re.compile(r"^play\s+(.+?)\s+on\s+spotify\s*$", re.IGNORECASE)
 _SPOTIFY_OPEN_RE = re.compile(r"^open\s+spotify\s*$", re.IGNORECASE)
@@ -166,8 +166,8 @@ _BRIEFING_PHRASES = {
 }
 
 
-def _route_jev_intent(text: str, phrase: str, lowered: str) -> ToolIntent | None:
-    """Route Jev's app-integration and productivity commands."""
+def _route_elsyia_intent(text: str, phrase: str, lowered: str) -> ToolIntent | None:
+    """Route Elsyia's app-integration and productivity commands."""
     match = _YOUTUBE_RE.match(text)
     if match:
         return ToolIntent("play_youtube", {"query": _clean(match.group(1))}, 0.97)
@@ -360,8 +360,8 @@ def route_intent(message: str) -> ToolIntent | None:
     if lowered in {"system info", "show system info", "what computer am i using", "computer info"}:
         return ToolIntent("get_system_info", {}, 0.99)
 
-    # === Jev integrations (checked before the generic "open X" rule) ===
-    routed = _route_jev_intent(text, phrase, lowered)
+    # === Elsyia integrations (checked before the generic "open X" rule) ===
+    routed = _route_elsyia_intent(text, phrase, lowered)
     if routed is not None:
         return routed
 
@@ -528,7 +528,7 @@ _FUZZY_COMMANDS: tuple[tuple[str, str, dict[str, Any]], ...] = (
 
 _STOPWORDS = frozenset({
     "the", "a", "an", "my", "me", "please", "kindly", "just", "now",
-    "hey", "jev", "could", "would", "can", "you", "it", "is", "are",
+    "hey", "elsyia", "could", "would", "can", "you", "it", "is", "are",
 })
 
 

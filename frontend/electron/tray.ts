@@ -50,7 +50,7 @@ export function refreshTrayMenu(): void {
 
 export function createTray(opts: { onSummon: () => void }): Tray {
   tray = new Tray(nativeImage.createFromPath(trayIconPath()));
-  tray.setToolTip("Jev — your voice assistant");
+  tray.setToolTip("Elsyia — your voice assistant");
 
   const rebuild = (): void => {
     const wakeEnabled = wakeWordControl
@@ -58,7 +58,7 @@ export function createTray(opts: { onSummon: () => void }): Tray {
       : getSetting<boolean>("wakeWordEnabled", false);
     const loginEnabled = getSetting<boolean>("startAtLogin", false);
     const menu = Menu.buildFromTemplate([
-      { label: "Show / hide Jev", click: opts.onSummon },
+      { label: "Show / hide Elsyia", click: opts.onSummon },
       { type: "separator" },
       {
         label: "Wake word listening",
@@ -84,7 +84,7 @@ export function createTray(opts: { onSummon: () => void }): Tray {
         },
       },
       { type: "separator" },
-      { label: "Quit Jev", click: () => app.quit() },
+      { label: "Quit Elsyia", click: () => app.quit() },
     ]);
     tray?.setContextMenu(menu);
   };

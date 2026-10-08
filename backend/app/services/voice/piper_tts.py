@@ -99,7 +99,7 @@ class PiperTTSProvider(TTSProvider):
             if dest.exists():
                 continue
             logger.info("Downloading Piper voice file %s …", url)
-            req = urllib.request.Request(url, headers={"User-Agent": "jev-voice-setup"})
+            req = urllib.request.Request(url, headers={"User-Agent": "elsyia-voice-setup"})
             with urllib.request.urlopen(req, timeout=180) as resp, open(dest, "wb") as fh:
                 fh.write(resp.read())
             logger.info("Saved %s", dest)

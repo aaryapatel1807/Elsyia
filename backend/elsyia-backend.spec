@@ -1,17 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec: freeze the Jev FastAPI backend into one executable.
+"""PyInstaller spec: freeze the Elsyia FastAPI backend into one executable.
 
 Build (any platform — the binary always targets the machine it is built on):
-    cd backend && /path/to/venv/bin/python -m PyInstaller --noconfirm --clean jev-backend.spec
+    cd backend && /path/to/venv/bin/python -m PyInstaller --noconfirm --clean elsyia-backend.spec
 or simply, from frontend/:
     npm run build:backend
 
-Output: backend/dist/jev-backend  (jev-backend.exe on Windows)
+Output: backend/dist/elsyia-backend  (elsyia-backend.exe on Windows)
 
 Notes:
 - Onefile mode: the binary unpacks to a temp dir on every launch. On
   machines with a tiny /tmp, set TMPDIR to a roomier directory.
-- Set JEV_BACKEND_CONSOLE=1 to keep a console window on Windows
+- Set ELSYIA_BACKEND_CONSOLE=1 to keep a console window on Windows
   (useful when debugging the first packaged build).
 """
 
@@ -37,7 +37,7 @@ def _collect(pkg):
     try:
         return collect_all(pkg)
     except Exception as exc:  # package not installed yet — skip it
-        print(f"[jev-backend.spec] optional package '{pkg}' not collected: {exc}")
+        print(f"[elsyia-backend.spec] optional package '{pkg}' not collected: {exc}")
         return [], [], []
 
 
@@ -98,10 +98,10 @@ hiddenimports += [
 # adds weight to the bundle.
 excludes = ["tkinter", "Tkinter"]
 
-console_mode = os.environ.get("JEV_BACKEND_CONSOLE", "") == "1"
+console_mode = os.environ.get("ELSYIA_BACKEND_CONSOLE", "") == "1"
 
 a = Analysis(
-    [os.path.join(HERE, "jev_backend_entry.py")],
+    [os.path.join(HERE, "elsyia_backend_entry.py")],
     pathex=[HERE],
     binaries=binaries,
     datas=datas,
@@ -122,7 +122,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="jev-backend",
+    name="elsyia-backend",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

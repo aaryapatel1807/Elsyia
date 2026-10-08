@@ -25,13 +25,13 @@ Non-visual, additive backend work (UI freeze honored). All commits local.
   the real tool registry. LLM proposes, deterministic systems dispose.
 - **`ask_user` mid-plan input**: agent plans can ask Aarya a clarifying question
   mid-flow; the plan pauses (`awaiting_input`) and resumes via
-  `POST /jev/agent/{id}/confirm` with `{"user_input": "..."}` — the answer
+  `POST /elsyia/agent/{id}/confirm` with `{"user_input": "..."}` — the answer
   threads into later steps via `{{steps.N.answer}}`.
 - **Ambient tools**: `get_weather` (keyless), `get_system_stats` (psutil),
   `get_world_news` (keyless RSS).
 - **Memory consolidation**: post-turn extract → reconcile (mem0-style
   ADD/UPDATE/DELETE/NOOP) → save as pending-review facts (`approved=False`),
-  behind `JEV_MEMORY_CONSOLIDATE` (default on). Fire-and-forget.
+  behind `ELSYIA_MEMORY_CONSOLIDATE` (default on). Fire-and-forget.
 - **Conversation compaction**: auto-summarized history with summary injection
   into the LLM context on overflow.
 - **Agent robustness**: one strict-prompt retry on empty plans; one retry on
@@ -75,7 +75,7 @@ Non-visual, additive backend work (UI freeze honored). All commits local.
 - **Recurring calendar events via gcsa** (MIT): new
   `create_recurring_calendar_event` tool — `daily`, `weekly`,
   `weekdays` (Mon–Fri), `monthly`, `yearly`, optional `count`/`until` —
-  built on gcsa's pythonic Event/Recurrence API over Jev's existing OAuth
+  built on gcsa's pythonic Event/Recurrence API over Elsyia's existing OAuth
   credentials. The raw-API one-off event tools are untouched. Natural
   language: "schedule breakfast every weekday at 8am" routes to it.
   Added to the confirmation-gated tool set (writes to Aarya's calendar).

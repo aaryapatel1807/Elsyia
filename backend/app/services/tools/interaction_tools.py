@@ -12,7 +12,7 @@ class AskUserTool(Tool):
 
     In agent mode the runner intercepts this tool: the plan pauses with
     status "awaiting_input" and resumes when the answer arrives via
-    POST /jev/agent/{plan_id}/confirm with {"user_input": "..."} — the
+    POST /elsyia/agent/{plan_id}/confirm with {"user_input": "..."} — the
     answer is threaded into later steps as the step result.
     In a single turn the question is simply spoken back.
     """

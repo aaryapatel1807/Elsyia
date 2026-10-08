@@ -1,14 +1,14 @@
 {
-  "id": "jev-notes",
-  "name": "Jev Notes",
+  "id": "elsyia-notes",
+  "name": "Elsyia Notes",
   "version": "1.0.0",
-  "description": "Voice notes: 'Jev, take a note buy milk' appends a timestamped entry to ~/.jev/notes.md; 'read my notes' reads them back.",
+  "description": "Voice notes: 'Elsyia, take a note buy milk' appends a timestamped entry to ~/.elsyia/notes.md; 'read my notes' reads them back.",
   "entrypoint": "backend/app/services/tools/integrations/productivity.py",
   "tools": ["take_note", "read_notes"],
   "voice_triggers": ["take a note {text}", "note down {text}", "remember {text}", "read my notes"],
   "capabilities": ["timestamped markdown notes", "human-readable local file"],
   "limits": ["single local file — no sync or tagging yet"],
-  "permissions": ["local.files.jev_data"],
+  "permissions": ["local.files.elsyia_data"],
   "enabled_by_default": true,
   "trusted": true
 }

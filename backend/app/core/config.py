@@ -156,13 +156,13 @@ class Settings(BaseSettings):
     # Piper settings
     PIPER_VOICE: str = Field(
         default="en_GB-alan-medium",
-        description="Default Piper voice model (Jev's Jarvis default: deep British male)"
+        description="Default Piper voice model (Elsyia's Jarvis default: deep British male)"
     )
-    JEV_TTS_VOICE: str = Field(
+    ELSYIA_TTS_VOICE: str = Field(
         default="",
-        description="Jev's speaking voice override (Piper voice id). Empty = use the "
-                    "persisted choice in ~/.jev/voice.json, else the PIPER_VOICE default. "
-                    "Switch at runtime via POST /jev/voice/select — no restart needed."
+        description="Elsyia's speaking voice override (Piper voice id). Empty = use the "
+                    "persisted choice in ~/.elsyia/voice.json, else the PIPER_VOICE default. "
+                    "Switch at runtime via POST /elsyia/voice/select — no restart needed."
     )
     PIPER_MODELS_DIR: str = Field(
         default="models/piper",
@@ -719,108 +719,108 @@ class Settings(BaseSettings):
         description="Semicolon-separated SHA-256 fingerprints of trusted Ed25519 plugin signing keys",
     )
 
-    # === Jev ===
-    JEV_DATA_DIR: str = Field(
-        default="~/.jev",
-        description="Directory for Jev-owned user data (contacts, notes, OAuth tokens)",
+    # === Elsyia ===
+    ELSYIA_DATA_DIR: str = Field(
+        default="~/.elsyia",
+        description="Directory for Elsyia-owned user data (contacts, notes, OAuth tokens)",
     )
     YOUTUBE_API_KEY: str = Field(
         default="",
         description="Optional free YouTube Data API key — resolves 'play X on YouTube' to the exact video",
     )
-    JEV_GOOGLE_CLIENT_JSON: str = Field(
+    ELSYIA_GOOGLE_CLIENT_JSON: str = Field(
         default="",
         description="Path to the OAuth client JSON (Desktop app) for Gmail/Calendar",
     )
-    JEV_GOOGLE_CLIENT_ID: str = Field(
+    ELSYIA_GOOGLE_CLIENT_ID: str = Field(
         default="",
-        description="Google OAuth client ID (alternative to JEV_GOOGLE_CLIENT_JSON)",
+        description="Google OAuth client ID (alternative to ELSYIA_GOOGLE_CLIENT_JSON)",
     )
-    JEV_GOOGLE_CLIENT_SECRET: str = Field(
+    ELSYIA_GOOGLE_CLIENT_SECRET: str = Field(
         default="",
-        description="Google OAuth client secret (alternative to JEV_GOOGLE_CLIENT_JSON)",
+        description="Google OAuth client secret (alternative to ELSYIA_GOOGLE_CLIENT_JSON)",
     )
 
-    # === Jev wake word (hands-free summoning) ===
-    JEV_WAKE_ENABLED: bool = Field(
+    # === Elsyia wake word (hands-free summoning) ===
+    ELSYIA_WAKE_ENABLED: bool = Field(
         default=False,
         description="Start the always-on wake-word listener with the backend "
         "(default off — the overlay toggle is the explicit opt-in)",
     )
-    JEV_WAKE_MODEL: str = Field(
+    ELSYIA_WAKE_MODEL: str = Field(
         default="hey_jarvis",
         description="Wake-word model: an openWakeWord model name (downloaded on "
         "first use) or a path to a custom .onnx/.tflite file",
     )
-    JEV_WAKE_THRESHOLD: float = Field(
+    ELSYIA_WAKE_THRESHOLD: float = Field(
         default=0.5,
         ge=0.0,
         le=1.0,
         description="Detection confidence threshold (higher = fewer false wakes)",
     )
-    JEV_WAKE_COOLDOWN_S: int = Field(
+    ELSYIA_WAKE_COOLDOWN_S: int = Field(
         default=45,
         ge=5,
         le=300,
-        description="Quiet period after a wake event so Jev's own reply can't re-trigger",
+        description="Quiet period after a wake event so Elsyia's own reply can't re-trigger",
     )
 
-    # === Jev dictation mode (say it, it types) ===
-    JEV_DICTATION_HOTKEY: str = Field(
+    # === Elsyia dictation mode (say it, it types) ===
+    ELSYIA_DICTATION_HOTKEY: str = Field(
         default="CommandOrControl+Shift+D",
         description="Global hotkey toggling dictation mode (read by the Electron shell at launch)",
     )
-    JEV_DICTATION_CONFIRM: bool = Field(
+    ELSYIA_DICTATION_CONFIRM: bool = Field(
         default=True,
         description="Show the cleaned-text preview (Type it / Re-record / Cancel) before typing",
     )
 
-    # === Jev MCP (Model Context Protocol): community integrations ===
-    JEV_MCP_ENABLED: bool = Field(
+    # === Elsyia MCP (Model Context Protocol): community integrations ===
+    ELSYIA_MCP_ENABLED: bool = Field(
         default=True,
         description="Connect user-configured MCP servers at startup (background, "
-        "graceful degradation — a dead server never breaks Jev)",
+        "graceful degradation — a dead server never breaks Elsyia)",
     )
-    JEV_MCP_CONFIG: str = Field(
-        default="~/.jev/mcp.json",
+    ELSYIA_MCP_CONFIG: str = Field(
+        default="~/.elsyia/mcp.json",
         description="Path to the MCP servers config file — the trust boundary: "
         "only servers listed here ever run",
     )
 
-    # === Jev agent mode ("say it and it's done" multi-step chaining) ===
-    JEV_AGENT_MAX_STEPS: int = Field(
+    # === Elsyia agent mode ("say it and it's done" multi-step chaining) ===
+    ELSYIA_AGENT_MAX_STEPS: int = Field(
         default=5,
         ge=1,
         le=10,
         description="Maximum tool steps the agent-mode planner may chain",
     )
-    JEV_AGENT_STEP_TIMEOUT_S: int = Field(
+    ELSYIA_AGENT_STEP_TIMEOUT_S: int = Field(
         default=60,
         ge=5,
         le=300,
         description="Per-step timeout for agent-mode tool execution",
     )
 
-    # === Jev memory consolidation (background, local-only) ===
-    JEV_MEMORY_CONSOLIDATE: bool = Field(
+    # === Elsyia memory consolidation (background, local-only) ===
+    ELSYIA_MEMORY_CONSOLIDATE: bool = Field(
         default=True,
-        description="Extract durable facts from Jev turns into pending-review "
+        description="Extract durable facts from Elsyia turns into pending-review "
         "memories in the background. Best-effort; never blocks a turn.",
     )
 
-    # === Jev screen-aware mode ("circle anything, then just ask") ===
-    JEV_SEE_HOTKEY: str = Field(
+    # === Elsyia screen-aware mode ("circle anything, then just ask") ===
+    ELSYIA_SEE_HOTKEY: str = Field(
         default="CommandOrControl+Shift+S",
         description="Global hotkey opening the region-select capture "
         "(read by the Electron shell at launch). The ONLY trigger for "
-        "screen capture — Jev never screenshots in the background.",
+        "screen capture — Elsyia never screenshots in the background.",
     )
-    JEV_SEE_MODEL: str = Field(
+    ELSYIA_SEE_MODEL: str = Field(
         default="moondream",
         description="Local Ollama vision model for screen-aware Q&A "
         "(`ollama pull moondream` once on the machine)",
     )
-    JEV_SEE_CAPTURE_TTL_S: int = Field(
+    ELSYIA_SEE_CAPTURE_TTL_S: int = Field(
         default=600,
         ge=60,
         le=3600,

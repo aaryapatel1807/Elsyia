@@ -1,13 +1,13 @@
-"""Frozen-backend entry point for the Jev desktop app.
+"""Frozen-backend entry point for the Elsyia desktop app.
 
-Used ONLY by PyInstaller (see jev-backend.spec). The Electron launcher
+Used ONLY by PyInstaller (see elsyia-backend.spec). The Electron launcher
 spawns the frozen binary and passes configuration through environment
-variables — notably JEV_USER_DATA, PORT and SECRET_KEY.
+variables — notably ELSYIA_USER_DATA, PORT and SECRET_KEY.
 
 Responsibilities:
   1. Make the bundled ``app`` package importable (sys._MEIPASS).
   2. Redirect every relative data path in Settings to an absolute path
-     under JEV_USER_DATA, so SQLite databases, logs and downloaded models
+     under ELSYIA_USER_DATA, so SQLite databases, logs and downloaded models
      land in the user's app-data directory instead of the bundle
      (which is read-only / wiped on every launch in onefile mode).
   3. Start uvicorn via app.main:run().
@@ -28,7 +28,7 @@ def _bootstrap_sys_path() -> None:
     if meipass:  # frozen by PyInstaller
         if meipass not in sys.path:
             sys.path.insert(0, meipass)
-    else:  # dev: allow `python jev_backend_entry.py` straight from backend/
+    else:  # dev: allow `python elsyia_backend_entry.py` straight from backend/
         here = os.path.dirname(os.path.abspath(__file__))
         if here not in sys.path:
             sys.path.insert(0, here)
@@ -36,7 +36,7 @@ def _bootstrap_sys_path() -> None:
 
 _bootstrap_sys_path()
 
-# Setting name -> path relative to JEV_USER_DATA.
+# Setting name -> path relative to ELSYIA_USER_DATA.
 # Mirrors the relative defaults in app.core.config.Settings.
 _PATH_SETTINGS: dict[str, str] = {
     "LOG_FILE": "logs/elysia.log",
@@ -59,7 +59,7 @@ _PATH_SETTINGS: dict[str, str] = {
 
 
 def _redirect_data_paths() -> None:
-    root = os.environ.get("JEV_USER_DATA")
+    root = os.environ.get("ELSYIA_USER_DATA")
     if not root:
         return
     base = Path(root)

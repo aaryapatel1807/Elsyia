@@ -1,4 +1,4 @@
-"""Google Calendar integration for Jev — official Calendar API.
+"""Google Calendar integration for Elsyia — official Calendar API.
 
 Same user-authorises-on-first-run OAuth pattern as Gmail (see oauth.py).
 Capabilities: read today's agenda, create events. Nothing is created in
@@ -12,7 +12,7 @@ from datetime import datetime, time, timezone
 from typing import Any
 
 from app.core import get_logger
-from app.services.jev.oauth import GoogleOAuth
+from app.services.elsyia.oauth import GoogleOAuth
 from app.services.tools.base import Tool, ToolError
 
 logger = get_logger(__name__)
@@ -90,7 +90,7 @@ class CalendarClient:
 def _require_connected() -> None:
     if not calendar_oauth().is_authorized():
         raise ToolError(
-            "Google Calendar is not connected yet. Say 'Jev, connect calendar' "
+            "Google Calendar is not connected yet. Say 'Elsyia, connect calendar' "
             "and I will open Google's sign-in page for you to authorise it."
         )
 
@@ -146,7 +146,7 @@ class CreateCalendarEventTool(Tool):
 
 
 def _gcsa_calendar():
-    """Build a gcsa GoogleCalendar bound to Jev's existing OAuth credentials."""
+    """Build a gcsa GoogleCalendar bound to Elsyia's existing OAuth credentials."""
     from gcsa.google_calendar import GoogleCalendar
 
     return GoogleCalendar(credentials=calendar_oauth().credentials())

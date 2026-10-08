@@ -1,8 +1,8 @@
-"""Jev productivity integrations: timers and notes.
+"""Elsyia productivity integrations: timers and notes.
 
 Timers reuse the existing local reminder store (a timer is a reminder due
 in N minutes), so no new infrastructure is needed. Notes are a plain
-markdown file at ~/.jev/notes.md — simple, durable, human-readable.
+markdown file at ~/.elsyia/notes.md — simple, durable, human-readable.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.services.jev.paths import jev_file
+from app.services.elsyia.paths import elsyia_file
 from app.services.tools.base import Tool, ToolError
 from app.services.tools.reminders import ReminderStore
 
@@ -48,7 +48,7 @@ class TakeNoteTool(Tool):
         text = (text or "").strip()
         if not text:
             raise ToolError("Tell me what to note down.")
-        path = jev_file(_NOTES_FILE)
+        path = elsyia_file(_NOTES_FILE)
         stamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
         existing = path.read_text(encoding="utf-8") if path.exists() else ""
         entry = f"\n## {stamp}\n{text}\n"
@@ -61,7 +61,7 @@ class ReadNotesTool(Tool):
     description = "Read back Aarya's recent notes."
 
     async def run(self, max_chars: int = 2000) -> dict[str, str]:
-        path = jev_file(_NOTES_FILE)
+        path = elsyia_file(_NOTES_FILE)
         if not path.exists():
             return {"notes": "", "message": "No notes yet."}
         content = path.read_text(encoding="utf-8")

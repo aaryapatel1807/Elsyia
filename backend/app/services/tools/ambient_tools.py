@@ -34,7 +34,7 @@ class GetWeatherTool(Tool):
         url = _WTTR_URL.format(location=place if place else "")
         try:
             async with httpx.AsyncClient(timeout=_WTTR_TIMEOUT_S) as client:
-                response = await client.get(url, headers={"User-Agent": "jev-assistant"})
+                response = await client.get(url, headers={"User-Agent": "elsyia-assistant"})
                 response.raise_for_status()
                 data = response.json()
         except Exception as exc:  # noqa: BLE001 — network/weather service issues
@@ -73,7 +73,7 @@ class GetWeatherTool(Tool):
 
 
 class GetSystemStatsTool(Tool):
-    """Live CPU / memory / disk snapshot of the machine Jev runs on."""
+    """Live CPU / memory / disk snapshot of the machine Elsyia runs on."""
 
     name = "get_system_stats"
     description = (
@@ -103,7 +103,7 @@ class GetSystemStatsTool(Tool):
 
 
 class MorningBriefingTool(Tool):
-    """Jev's signature move: a spoken morning briefing.
+    """Elsyia's signature move: a spoken morning briefing.
 
     Composes calendar events, weather, and pending reminders into one
     summary — "here's your day". Imports sibling tools lazily so this
@@ -122,9 +122,9 @@ class MorningBriefingTool(Tool):
         parts: list[str] = []
         data: dict[str, Any] = {}
 
-        # Calendar (best-effort: Jev may not be connected yet).
+        # Calendar (best-effort: Elsyia may not be connected yet).
         try:
-            from app.services.jev.calendar import CalendarTodayTool
+            from app.services.elsyia.calendar import CalendarTodayTool
 
             events = await CalendarTodayTool().run()
             items = events.get("events", []) if isinstance(events, dict) else []

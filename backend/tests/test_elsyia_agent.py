@@ -1,4 +1,4 @@
-"""Tests for Jev agent mode: planner, executor, threading, confirm pauses.
+"""Tests for Elsyia agent mode: planner, executor, threading, confirm pauses.
 
 The Ollama planner and the tool registry are both faked — no network,
 no live mailbox, no real side effects.
@@ -6,8 +6,8 @@ no live mailbox, no real side effects.
 
 import pytest
 
-import app.services.jev.agent as agent_module
-from app.services.jev.agent import (
+import app.services.elsyia.agent as agent_module
+from app.services.elsyia.agent import (
     AgentRunner,
     looks_multi_intent,
     resolve_placeholders,
@@ -261,8 +261,8 @@ async def test_step_timeout_fails_the_plan(runner, fake_registry, monkeypatch):
     monkeypatch.setattr(fake_registry, "execute", _slow)
     monkeypatch.setattr(
         agent_module, "get_settings",
-        lambda: SimpleNamespace(JEV_AGENT_MAX_STEPS=5,
-                               JEV_AGENT_STEP_TIMEOUT_S=1,
+        lambda: SimpleNamespace(ELSYIA_AGENT_MAX_STEPS=5,
+                               ELSYIA_AGENT_STEP_TIMEOUT_S=1,
                                DEFAULT_LLM_PROVIDER="ollama"))
     monkeypatch.setattr(
         agent_module, "plan_with_llm",

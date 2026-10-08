@@ -11,12 +11,12 @@ import SyncPanel from "@/components/SyncPanel";
 import AdminPanel from "@/components/AdminPanel";
 import PreferencesPanel from "@/components/PreferencesPanel";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
-import JevOverlay from "@/components/JevOverlay";
+import ElsyiaOverlay from "@/components/ElsyiaOverlay";
 import SeeSelect from "@/components/SeeSelect";
 
-const isJevOverlay =
+const isElsyiaOverlay =
   typeof window !== "undefined" &&
-  new URLSearchParams(window.location.search).get("overlay") === "jev";
+  new URLSearchParams(window.location.search).get("overlay") === "elsyia";
 
 const isSeeSelect =
   typeof window !== "undefined" &&
@@ -26,8 +26,8 @@ export default function App() {
   if (isSeeSelect) {
     return <SeeSelect />;
   }
-  if (isJevOverlay) {
-    return <JevOverlay />;
+  if (isElsyiaOverlay) {
+    return <ElsyiaOverlay />;
   }
   const { status, toolResult, lastError, startListening, stopListeningAndRespond, forceResetToIdle, isRecording } = useVoiceAssistant();
   const [memoryOpen, setMemoryOpen] = useState(false);

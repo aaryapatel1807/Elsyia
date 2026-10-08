@@ -1,13 +1,13 @@
-"""Jev voice picker — choose Piper TTS voices, Jarvis-style.
+"""Elsyia voice picker — choose Piper TTS voices, Jarvis-style.
 
 API + config only (UI freeze: the overlay never changes). Everything here
-is driven by the ``JEV_TTS_VOICE`` setting and the ``/jev/voice/*``
+is driven by the ``ELSYIA_TTS_VOICE`` setting and the ``/elsyia/voice/*``
 endpoints.
 
 Voices are Piper ``.onnx`` + ``.onnx.json`` pairs — free, local, downloaded
 from HuggingFace (rhasspy/piper-voices). Switching is hot: no backend
 restart needed. Downloads are explicit-only: nothing is ever fetched
-unless the user asks via ``POST /jev/voice/download`` (the provider's own
+unless the user asks via ``POST /elsyia/voice/download`` (the provider's own
 first-run fetch for the *active* voice is the single exception, and it is
 documented in the README).
 """
@@ -24,17 +24,17 @@ from typing import Any, AsyncGenerator, Callable
 from urllib.request import Request, urlopen
 
 from app.core import TTSError, get_logger, get_settings
-from app.services.jev.paths import jev_file
+from app.services.elsyia.paths import elsyia_file
 from app.services.voice.piper_tts import PiperTTSProvider
 
-logger = get_logger("jev.voice_picker")
+logger = get_logger("elsyia.voice_picker")
 
 STATE_FILE = "voice.json"
 
 # lang_REGION-name-quality, e.g. en_GB-alan-medium
 VOICE_ID_RE = re.compile(r"^([a-z]{2})_([A-Z]{2})-([a-z0-9_]+)-(x_low|low|medium|high)$")
 
-#: The Jarvis default — see README "Jev's voice" for why.
+#: The Jarvis default — see README "Elsyia's voice" for why.
 JARVIS_DEFAULT_VOICE = "en_GB-alan-medium"
 
 #: Curated Piper English voices (rhasspy/piper-voices). Gender/quality notes
@@ -43,13 +43,13 @@ JARVIS_DEFAULT_VOICE = "en_GB-alan-medium"
 VOICE_CATALOG: list[dict[str, str]] = [
     # --- Jarvis candidates: deep male voices ---
     {"id": "en_GB-alan-medium", "language": "English (British)", "gender": "male",
-     "quality": "medium", "notes": "Deep British male — the Jarvis pick. Matches Jev's butler persona."},
+     "quality": "medium", "notes": "Deep British male — the Jarvis pick. Matches Elsyia's butler persona."},
     {"id": "en_US-ryan-medium", "language": "English (US)", "gender": "male",
      "quality": "medium", "notes": "Clear American male — the US alternative to alan."},
     {"id": "en_US-ryan-high", "language": "English (US)", "gender": "male",
      "quality": "high", "notes": "Higher-fidelity Ryan; heavier download."},
     {"id": "en_US-lessac-medium", "language": "English (US)", "gender": "male",
-     "quality": "medium", "notes": "Previous Jev default; neutral American male."},
+     "quality": "medium", "notes": "Previous Elsyia default; neutral American male."},
     {"id": "en_US-joe-medium", "language": "English (US)", "gender": "male",
      "quality": "medium", "notes": "Warm American male."},
     {"id": "en_US-bryce-medium", "language": "English (US)", "gender": "male",
@@ -75,7 +75,7 @@ VOICE_CATALOG: list[dict[str, str]] = [
      "quality": "medium", "notes": "British female."},
 ]
 
-PREVIEW_TEXT = "Good evening. I am Jev, at your service."
+PREVIEW_TEXT = "Good evening. I am Elsyia, at your service."
 
 
 class VoiceNotAvailable(TTSError):
@@ -102,7 +102,7 @@ def _models_dir() -> Path:
 
 
 def _state_path(explicit: Path | None = None) -> Path:
-    return explicit if explicit is not None else jev_file(STATE_FILE)
+    return explicit if explicit is not None else elsyia_file(STATE_FILE)
 
 
 def installed_voices(models_dir: Path | None = None) -> set[str]:
@@ -122,7 +122,7 @@ def resolve_active_voice(
     state_path: Path | None = None,
     models_dir: Path | None = None,
 ) -> str:
-    """Effective voice: persisted choice > JEV_TTS_VOICE > PIPER_VOICE.
+    """Effective voice: persisted choice > ELSYIA_TTS_VOICE > PIPER_VOICE.
 
     Falls back to the Jarvis default when nothing is configured.
     """
@@ -135,7 +135,7 @@ def resolve_active_voice(
     except (OSError, ValueError):
         pass
     settings = get_settings()
-    for candidate in (getattr(settings, "JEV_TTS_VOICE", ""), settings.PIPER_VOICE):
+    for candidate in (getattr(settings, "ELSYIA_TTS_VOICE", ""), settings.PIPER_VOICE):
         candidate = normalize_voice_id(str(candidate or ""))
         if candidate and is_valid_voice_id(candidate):
             return candidate
@@ -184,11 +184,11 @@ def select_voice(voice_id: str, state_path: Path | None = None,
     if vid not in installed_voices(models_dir or _models_dir()):
         raise VoiceNotAvailable(
             f"Voice '{vid}' is not downloaded. Fetch it first with "
-            f"POST /jev/voice/download, then select it."
+            f"POST /elsyia/voice/download, then select it."
         )
     path = _state_path(state_path)
     path.write_text(json.dumps({"voice": vid}, indent=2), encoding="utf-8")
-    logger.info("Jev voice set to '%s' (persisted at %s)", vid, path)
+    logger.info("Elsyia voice set to '%s' (persisted at %s)", vid, path)
     return vid
 
 
@@ -202,7 +202,7 @@ async def preview_wav(voice_id: str, text: str | None = None,
     if vid not in installed_voices(directory):
         raise VoiceNotAvailable(
             f"Voice '{vid}' is not downloaded — fetch it with "
-            f"POST /jev/voice/download before previewing."
+            f"POST /elsyia/voice/download before previewing."
         )
     settings = get_settings()
     provider = PiperTTSProvider(voice=vid, models_dir=str(directory),
@@ -250,7 +250,7 @@ def download_voice(
         if dest.exists():
             continue
         logger.info("Downloading Piper voice file %s …", url)
-        req = Request(url, headers={"User-Agent": "jev-voice-picker"})
+        req = Request(url, headers={"User-Agent": "elsyia-voice-picker"})
         try:
             with urlopen(req, timeout=300) as resp:
                 total: int | None = None

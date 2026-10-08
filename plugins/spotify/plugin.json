@@ -1,8 +1,8 @@
 {
-  "id": "jev-spotify",
-  "name": "Jev Spotify",
+  "id": "elsyia-spotify",
+  "name": "Elsyia Spotify",
   "version": "1.0.0",
-  "description": "Voice control for Spotify: 'Jev, play lo-fi on Spotify' opens the search; playback via system media keys.",
+  "description": "Voice control for Spotify: 'Elsyia, play lo-fi on Spotify' opens the search; playback via system media keys.",
   "entrypoint": "backend/app/services/tools/integrations/media.py:OpenSpotifyTool",
   "tools": ["open_spotify", "media_control"],
   "voice_triggers": ["play {query} on spotify", "open spotify", "pause", "next song"],

@@ -1,20 +1,20 @@
 /**
- * Jev screen-aware mode — global hotkey wiring (main process).
+ * Elsyia screen-aware mode — global hotkey wiring (main process).
  *
- * [jev-see] Press the hotkey to open the region-select overlay. The main
+ * [elsyia-see] Press the hotkey to open the region-select overlay. The main
  * process only forwards the press; the overlay owns selection, capture
  * goes through desktopCapturer, and the backend stores it. This module is
  * intentionally self-contained so other main-process work stays
  * untouched apart from the one call site in main.ts.
  *
- * Privacy: this hotkey is the ONLY trigger for screen capture in Jev.
+ * Privacy: this hotkey is the ONLY trigger for screen capture in Elsyia.
  * There is no background watching and no ambient screenshots anywhere.
  */
 import { globalShortcut } from "electron";
 
-/** Default global hotkey; override with JEV_SEE_HOTKEY before launch. */
+/** Default global hotkey; override with ELSYIA_SEE_HOTKEY before launch. */
 export const SEE_HOTKEY =
-  process.env.JEV_SEE_HOTKEY || "CommandOrControl+Shift+S";
+  process.env.ELSYIA_SEE_HOTKEY || "CommandOrControl+Shift+S";
 
 export interface SeeHotkeyDeps {
   /** Called on every hotkey press — opens the region-select overlay. */
@@ -25,9 +25,9 @@ export interface SeeHotkeyDeps {
 export function registerSeeHotkey(deps: SeeHotkeyDeps): boolean {
   const ok = globalShortcut.register(SEE_HOTKEY, deps.onPress);
   if (ok) {
-    console.log(`[Jev] Screen-aware hotkey registered: ${SEE_HOTKEY}`);
+    console.log(`[Elsyia] Screen-aware hotkey registered: ${SEE_HOTKEY}`);
   } else {
-    console.error(`[Jev] Failed to register screen-aware hotkey ${SEE_HOTKEY}`);
+    console.error(`[Elsyia] Failed to register screen-aware hotkey ${SEE_HOTKEY}`);
   }
   return ok;
 }
@@ -41,7 +41,7 @@ export interface Rect {
 
 /**
  * Normalize a mouse drag (start + current point, CSS px) into a rect.
- * Pure — unit-tested (see backend/tests/test_jev_see.py for the contract;
+ * Pure — unit-tested (see backend/tests/test_elsyia_see.py for the contract;
  * the TS implementation is exercised via the compiled smoke check).
  */
 export function normalizeRect(

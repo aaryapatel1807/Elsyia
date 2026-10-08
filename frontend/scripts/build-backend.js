@@ -46,12 +46,12 @@ try {
 }
 
 console.log("[build:backend] freezing backend (this takes a few minutes)…");
-execFileSync(python, ["-m", "PyInstaller", "--noconfirm", "--clean", "jev-backend.spec"], {
+execFileSync(python, ["-m", "PyInstaller", "--noconfirm", "--clean", "elsyia-backend.spec"], {
   cwd: backendDir,
   stdio: "inherit",
 });
 
-const exeName = "jev-backend" + (process.platform === "win32" ? ".exe" : "");
+const exeName = "elsyia-backend" + (process.platform === "win32" ? ".exe" : "");
 const src = path.join(backendDir, "dist", exeName);
 if (!fs.existsSync(src)) {
   throw new Error(`PyInstaller did not produce ${src}`);

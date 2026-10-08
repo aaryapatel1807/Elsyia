@@ -37,14 +37,14 @@ export function refreshTrayMenu() {
 }
 export function createTray(opts) {
     tray = new Tray(nativeImage.createFromPath(trayIconPath()));
-    tray.setToolTip("Jev — your voice assistant");
+    tray.setToolTip("Elsyia — your voice assistant");
     const rebuild = () => {
         const wakeEnabled = wakeWordControl
             ? wakeWordControl.isEnabled()
             : getSetting("wakeWordEnabled", false);
         const loginEnabled = getSetting("startAtLogin", false);
         const menu = Menu.buildFromTemplate([
-            { label: "Show / hide Jev", click: opts.onSummon },
+            { label: "Show / hide Elsyia", click: opts.onSummon },
             { type: "separator" },
             {
                 label: "Wake word listening",
@@ -70,7 +70,7 @@ export function createTray(opts) {
                 },
             },
             { type: "separator" },
-            { label: "Quit Jev", click: () => app.quit() },
+            { label: "Quit Elsyia", click: () => app.quit() },
         ]);
         tray?.setContextMenu(menu);
     };

@@ -28,25 +28,25 @@ dependencies = [
     "piper-tts>=1.2.0",
     # Ollama client
     "ollama>=0.1.0",
-    # Google APIs: Gmail, Calendar, YouTube Data (Jev integrations)
+    # Google APIs: Gmail, Calendar, YouTube Data (Elsyia integrations)
     "google-api-python-client>=2.100.0",
     "google-auth-oauthlib>=1.2.0",
     "google-auth-httplib2>=0.2.0",
-    # Jev wake word: on-device keyword spotting (openWakeWord) + mic capture
+    # Elsyia wake word: on-device keyword spotting (openWakeWord) + mic capture
     "openwakeword>=0.6.0",
     "sounddevice>=0.4.6",
-    # Jev dictation mode: type into the focused app (pynput keyboard injection)
+    # Elsyia dictation mode: type into the focused app (pynput keyboard injection)
     "pynput>=1.7.7",
-    # Jev MCP client: community integrations via the Model Context Protocol
+    # Elsyia MCP client: community integrations via the Model Context Protocol
     "mcp>=1.0.0",
-    # Jev ambient tools: live system stats (CPU/memory/disk)
+    # Elsyia ambient tools: live system stats (CPU/memory/disk)
     "psutil>=5.9.0",
-    # Jev web tools: keyless metasearch + article extraction (no API keys)
+    # Elsyia web tools: keyless metasearch + article extraction (no API keys)
     "ddgs>=9.0.0",
     "trafilatura>=2.0.0",
-    # Jev reminders: native cross-platform desktop notifications
+    # Elsyia reminders: native cross-platform desktop notifications
     "desktop-notifier>=5.0.0",
-    # Jev calendar: recurring events via pythonic gcsa API (MIT) over the
+    # Elsyia calendar: recurring events via pythonic gcsa API (MIT) over the
     # official Google Calendar API; raw-API client kept for one-off events
     "gcsa>=2.7.0",
 ]

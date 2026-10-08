@@ -55,16 +55,16 @@ from app.services.tools.ambient_tools import (
     GetWeatherTool,
     MorningBriefingTool,
 )
-# Jev integrations: media/messaging/social, Gmail + Calendar (OAuth),
-# timers and notes. Imported after the registry so the jev package
+# Elsyia integrations: media/messaging/social, Gmail + Calendar (OAuth),
+# timers and notes. Imported after the registry so the elsyia package
 # (which references the registry submodule) cannot partially initialise.
-from app.services.jev.calendar import (
+from app.services.elsyia.calendar import (
     CalendarTodayTool,
     ConnectCalendarTool,
     CreateCalendarEventTool,
     CreateRecurringCalendarEventTool,
 )
-from app.services.jev.gmail import (
+from app.services.elsyia.gmail import (
     CheckGmailTool,
     ConnectGmailTool,
     ReadGmailTool,
@@ -145,7 +145,7 @@ AVAILABLE_TOOLS: list[Tool] = [
     CaptureScreenTool(),
     OcrImageTool(),
     SeeCaptureTool(),
-    # --- Jev integrations ---
+    # --- Elsyia integrations ---
     PlayYouTubeTool(),
     MediaControlTool(),
     MessageWhatsAppTool(),
@@ -191,7 +191,7 @@ for _tool in AVAILABLE_TOOLS:
                 "download_browser_file",
                 "capture_screen",
                 "ocr_image",
-                # --- Jev: acting on the outside world needs Aarya's say-so ---
+                # --- Elsyia: acting on the outside world needs Aarya's say-so ---
                 "send_gmail",
                 "create_calendar_event",
                 "create_recurring_calendar_event",

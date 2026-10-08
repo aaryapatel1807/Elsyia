@@ -1,4 +1,4 @@
-"""Jev screen-aware mode: "circle anything, then just ask".
+"""Elsyia screen-aware mode: "circle anything, then just ask".
 
 Explicit-trigger vision Q&A over a local Ollama vision model
 (moondream by default — `ollama pull moondream`).
@@ -8,7 +8,7 @@ A screen capture enters the system ONLY through the user's explicit
 region-select hotkey (Ctrl+Shift+S by default). There is no background
 watching, no ambient screenshots, no periodic capture, and no code
 path anywhere else that stores a capture. The capture lives in memory
-with a short TTL, is answered against, and is discarded. Jev only
+with a short TTL, is answered against, and is discarded. Elsyia only
 looks when you ask.
 """
 
@@ -23,7 +23,7 @@ import httpx
 
 from app.core import LLMError, get_logger, get_settings
 
-logger = get_logger("jev.see")
+logger = get_logger("elsyia.see")
 
 
 class SeeUnavailable(Exception):
@@ -34,16 +34,16 @@ class SeeService:
     """In-memory current-capture store + local vision Q&A.
 
     Exactly one "current" capture exists at a time. It is written only
-    by `store_capture` (called from POST /jev/see/capture, which the
+    by `store_capture` (called from POST /elsyia/see/capture, which the
     Electron shell calls after the user's explicit region select) and
-    expires after JEV_SEE_CAPTURE_TTL_S.
+    expires after ELSYIA_SEE_CAPTURE_TTL_S.
     """
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._model = settings.JEV_SEE_MODEL
+        self._model = settings.ELSYIA_SEE_MODEL
         self._base_url = "http://localhost:11434"
-        self._ttl_s = settings.JEV_SEE_CAPTURE_TTL_S
+        self._ttl_s = settings.ELSYIA_SEE_CAPTURE_TTL_S
         self._capture: dict[str, Any] | None = None
         # Localhost only — proxy env vars must never interfere.
         self._client = httpx.AsyncClient(
@@ -110,7 +110,7 @@ class SeeService:
             "model_available": self._model_available(models),
             "ollama_reachable": ollama_ok,
             "has_capture": self.has_capture(),
-            "hotkey": get_settings().JEV_SEE_HOTKEY,
+            "hotkey": get_settings().ELSYIA_SEE_HOTKEY,
         }
 
     async def answer(self, question: str, capture_id: str | None = None) -> dict[str, Any]:
@@ -142,7 +142,7 @@ class SeeService:
                 {
                     "role": "user",
                     "content": (
-                        "You are Jev, a helpful desktop assistant. Answer the "
+                        "You are Elsyia, a helpful desktop assistant. Answer the "
                         "question about the attached screen capture concisely, "
                         "in plain spoken style, no markdown headers. If the "
                         "question cannot be answered from the image, say so "

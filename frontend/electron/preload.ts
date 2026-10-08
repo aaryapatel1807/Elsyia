@@ -4,61 +4,61 @@
  */
 import { contextBridge, ipcRenderer } from "electron";
 
-export interface JevSummonInfo {
+export interface ElsyiaSummonInfo {
   /** True when the summon came from the wake-word listener (hands-free). */
   wake: boolean;
-  /** [jev-dictation] True when the summon toggles dictation mode (record/type). */
+  /** [elsyia-dictation] True when the summon toggles dictation mode (record/type). */
   dictate?: boolean;
-  /** [jev-see] True when the summon follows an explicit region capture. */
+  /** [elsyia-see] True when the summon follows an explicit region capture. */
   see?: boolean;
-  /** [jev-see] Data-URL thumbnail of the captured region, when see is true. */
+  /** [elsyia-see] Data-URL thumbnail of the captured region, when see is true. */
   thumbnail?: string;
 }
 
 contextBridge.exposeInMainWorld("elysia", {
   version: "0.1.0",
-  /** Fired when the global Jev hotkey (or wake word) summons the overlay. */
-  onJevSummon: (callback: (info?: JevSummonInfo) => void): (() => void) => {
-    const listener = (_event: unknown, info?: JevSummonInfo) => callback(info);
-    ipcRenderer.on("jev-summon", listener);
-    return () => ipcRenderer.removeListener("jev-summon", listener);
+  /** Fired when the global Elsyia hotkey (or wake word) summons the overlay. */
+  onElsyiaSummon: (callback: (info?: ElsyiaSummonInfo) => void): (() => void) => {
+    const listener = (_event: unknown, info?: ElsyiaSummonInfo) => callback(info);
+    ipcRenderer.on("elsyia-summon", listener);
+    return () => ipcRenderer.removeListener("elsyia-summon", listener);
   },
-  /** Ask the main process to hide the Jev overlay window. */
-  hideJevOverlay: (): void => {
-    ipcRenderer.send("jev-hide-overlay");
+  /** Ask the main process to hide the Elsyia overlay window. */
+  hideElsyiaOverlay: (): void => {
+    ipcRenderer.send("elsyia-hide-overlay");
   },
   /** Tell the main process to start/stop polling the backend wake-word event. */
   setWakeWordPolling: (enabled: boolean): void => {
-    ipcRenderer.send("jev-wakeword-polling", enabled);
+    ipcRenderer.send("elsyia-wakeword-polling", enabled);
   },
   /**
    * Backend base URL chosen by the main process (a free loopback port in
    * the packaged app; the dev uvicorn URL otherwise). The renderer must
    * use this instead of a hardcoded port.
    */
-  backendUrl: (): string => process.env.JEV_BACKEND_URL ?? "http://127.0.0.1:8000",
+  backendUrl: (): string => process.env.ELSYIA_BACKEND_URL ?? "http://127.0.0.1:8000",
   /** First-run setup screen: re-check Ollama reachability. */
   retrySetup: (): void => {
-    ipcRenderer.send("jev-setup-retry");
+    ipcRenderer.send("elsyia-setup-retry");
   },
   /** First-run setup screen: result of the Ollama re-check. */
   onSetupStatus: (callback: (ok: boolean) => void): (() => void) => {
     const listener = (_event: unknown, ok: boolean) => callback(ok);
-    ipcRenderer.on("jev-setup-status", listener);
-    return () => ipcRenderer.removeListener("jev-setup-status", listener);
+    ipcRenderer.on("elsyia-setup-status", listener);
+    return () => ipcRenderer.removeListener("elsyia-setup-status", listener);
   },
   /** Open a URL in the user's default browser. */
   openExternal: (url: string): void => {
-    ipcRenderer.send("jev-open-external", url);
+    ipcRenderer.send("elsyia-open-external", url);
   },
   /** Fired when the wake-word switch changes (e.g. from the tray menu). */
   onWakeWordState: (callback: (on: boolean) => void): (() => void) => {
     const listener = (_event: unknown, on: boolean) => callback(on);
-    ipcRenderer.on("jev-wakeword-state", listener);
-    return () => ipcRenderer.removeListener("jev-wakeword-state", listener);
+    ipcRenderer.on("elsyia-wakeword-state", listener);
+    return () => ipcRenderer.removeListener("elsyia-wakeword-state", listener);
   },
   /**
-   * [jev-see] Region-select overlay: report the user-dragged rectangle
+   * [elsyia-see] Region-select overlay: report the user-dragged rectangle
    * (CSS pixels, relative to the select window). This is the only path
    * that leads to a screen capture.
    */
@@ -68,10 +68,10 @@ contextBridge.exposeInMainWorld("elysia", {
     width: number;
     height: number;
   }): void => {
-    ipcRenderer.send("jev-see-region", rect);
+    ipcRenderer.send("elsyia-see-region", rect);
   },
-  /** [jev-see] Cancel the region select (Esc) — no capture happens. */
+  /** [elsyia-see] Cancel the region select (Esc) — no capture happens. */
   cancelSeeSelect: (): void => {
-    ipcRenderer.send("jev-see-cancel");
+    ipcRenderer.send("elsyia-see-cancel");
   },
 });

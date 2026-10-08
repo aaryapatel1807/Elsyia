@@ -1,4 +1,4 @@
-"""Gmail integration for Jev — official Gmail API, user-authorised OAuth.
+"""Gmail integration for Elsyia — official Gmail API, user-authorised OAuth.
 
 Capabilities (real, via the official API):
 - list unread inbox messages (sender, subject, snippet, date)
@@ -6,7 +6,7 @@ Capabilities (real, via the official API):
 - read a message body as plain text
 - send email on voice command
 
-Hard boundary: Jev never touches Aarya's live mailbox during
+Hard boundary: Elsyia never touches Aarya's live mailbox during
 development — the test-suite mocks the API client. OAuth setup is a
 one-time documented step he performs himself.
 """
@@ -19,7 +19,7 @@ from email.message import EmailMessage
 from typing import Any
 
 from app.core import get_logger
-from app.services.jev.oauth import GoogleOAuth
+from app.services.elsyia.oauth import GoogleOAuth
 from app.services.tools.base import Tool, ToolError
 
 logger = get_logger(__name__)
@@ -163,7 +163,7 @@ class GmailClient:
 def _require_connected() -> None:
     if not gmail_oauth().is_authorized():
         raise ToolError(
-            "Gmail is not connected yet. Say 'Jev, connect Gmail' and I will "
+            "Gmail is not connected yet. Say 'Elsyia, connect Gmail' and I will "
             "open Google's sign-in page for you to authorise your own account."
         )
 

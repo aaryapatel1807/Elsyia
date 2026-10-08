@@ -1,20 +1,20 @@
-"""Jev API — the assistant's voice/text loop and integrations.
+"""Elsyia API — the assistant's voice/text loop and integrations.
 
 Endpoints:
-- POST /jev/turn      one voice turn: audio in -> transcript + reply + actions
-- POST /jev/ask       one text turn (same loop, no STT)
-- GET  /jev/status    loop health: STT/LLM/TTS readiness, OAuth state, latency
-- POST /jev/gmail/connect     start Google sign-in for Gmail (opens browser)
-- GET  /jev/gmail/status      Gmail authorisation state
-- GET  /jev/gmail/unread      unread inbox (needs Gmail connected)
-- POST /jev/calendar/connect  start Google sign-in for Calendar
-- GET  /jev/calendar/status   Calendar authorisation state
-- GET  /jev/calendar/today    today's agenda (needs Calendar connected)
-- POST /jev/agent             agent mode: plan + execute a multi-step command
-- POST /jev/agent/{id}/confirm  resume a plan paused for confirmation
-- POST /jev/agent/{id}/cancel   cancel a running/paused plan
-- GET  /jev/agent/{id}        current state of a plan
-- GET  /jev/agent/status      agent-mode health: planner, caps, active plans
+- POST /elsyia/turn      one voice turn: audio in -> transcript + reply + actions
+- POST /elsyia/ask       one text turn (same loop, no STT)
+- GET  /elsyia/status    loop health: STT/LLM/TTS readiness, OAuth state, latency
+- POST /elsyia/gmail/connect     start Google sign-in for Gmail (opens browser)
+- GET  /elsyia/gmail/status      Gmail authorisation state
+- GET  /elsyia/gmail/unread      unread inbox (needs Gmail connected)
+- POST /elsyia/calendar/connect  start Google sign-in for Calendar
+- GET  /elsyia/calendar/status   Calendar authorisation state
+- GET  /elsyia/calendar/today    today's agenda (needs Calendar connected)
+- POST /elsyia/agent             agent mode: plan + execute a multi-step command
+- POST /elsyia/agent/{id}/confirm  resume a plan paused for confirmation
+- POST /elsyia/agent/{id}/cancel   cancel a running/paused plan
+- GET  /elsyia/agent/{id}        current state of a plan
+- GET  /elsyia/agent/status      agent-mode health: planner, caps, active plans
 """
 
 from __future__ import annotations
@@ -29,12 +29,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.core import TTSError, get_logger, get_settings
-from app.services.jev.agent import get_agent_runner
-from app.services.jev.calendar import CalendarClient, calendar_oauth
-from app.services.jev.gmail import GmailClient, gmail_oauth
-from app.services.jev.loop import get_jev_loop
-from app.services.jev.persona import JEV_NAME
-from app.services.jev.voice_picker import (
+from app.services.elsyia.agent import get_agent_runner
+from app.services.elsyia.calendar import CalendarClient, calendar_oauth
+from app.services.elsyia.gmail import GmailClient, gmail_oauth
+from app.services.elsyia.loop import get_elsyia_loop
+from app.services.elsyia.persona import ELSYIA_NAME
+from app.services.elsyia.voice_picker import (
     PREVIEW_TEXT,
     VoiceNotAvailable,
     download_voice_async,
@@ -43,23 +43,23 @@ from app.services.jev.voice_picker import (
     resolve_active_voice,
     select_voice,
 )
-from app.services.jev.wakeword import WakeWordUnavailable, get_wakeword_service
-from app.services.jev.mcp_client import get_mcp_manager
-from app.services.jev.see import SeeUnavailable, get_see_service
+from app.services.elsyia.wakeword import WakeWordUnavailable, get_wakeword_service
+from app.services.elsyia.mcp_client import get_mcp_manager
+from app.services.elsyia.see import SeeUnavailable, get_see_service
 from app.services.llm.factory import get_llm_provider
 from app.services.voice.factory import get_stt_provider, get_tts_provider
 
-logger = get_logger("api.jev")
+logger = get_logger("api.elsyia")
 router = APIRouter()
 
 
-class JevAskRequest(BaseModel):
+class ElsyiaAskRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=4000)
     conversation_id: str | None = None
     confirmed: list[str] = Field(default_factory=list)
 
 
-class JevAction(BaseModel):
+class ElsyiaAction(BaseModel):
     tool: str
     status: str
     confirmation_required: bool = False
@@ -68,22 +68,22 @@ class JevAction(BaseModel):
     result: Any | None = None
 
 
-class JevTurnResponse(BaseModel):
+class ElsyiaTurnResponse(BaseModel):
     transcript: str
     reply: str
     conversation_id: str
     intent: str
-    actions: list[JevAction]
+    actions: list[ElsyiaAction]
     timings_ms: dict[str, float]
 
 
-def _to_response(result) -> JevTurnResponse:
-    return JevTurnResponse(
+def _to_response(result) -> ElsyiaTurnResponse:
+    return ElsyiaTurnResponse(
         transcript=result.transcript,
         reply=result.reply,
         conversation_id=result.conversation_id,
         intent=result.intent,
-        actions=[JevAction(**a) for a in result.actions],
+        actions=[ElsyiaAction(**a) for a in result.actions],
         timings_ms=result.timings_ms,
     )
 
@@ -97,8 +97,8 @@ def _conversation_uuid(raw: str | None) -> UUID | None:
         return None
 
 
-@router.post("/turn", response_model=JevTurnResponse)
-async def jev_turn(
+@router.post("/turn", response_model=ElsyiaTurnResponse)
+async def elsyia_turn(
     audio: UploadFile = File(...),
     conversation_id: str | None = Form(None),
     confirmed: str | None = Form(None),
@@ -108,7 +108,7 @@ async def jev_turn(
     confirmed_tools = (
         {c.strip() for c in confirmed.split(",") if c.strip()} if confirmed else set()
     )
-    result = await get_jev_loop().handle_voice(
+    result = await get_elsyia_loop().handle_voice(
         data,
         conversation_id=_conversation_uuid(conversation_id),
         confirmed=confirmed_tools,
@@ -116,10 +116,10 @@ async def jev_turn(
     return _to_response(result)
 
 
-@router.post("/ask", response_model=JevTurnResponse)
-async def jev_ask(request: JevAskRequest):
-    """One text turn through the same Jev loop (no audio)."""
-    result = await get_jev_loop().handle_text(
+@router.post("/ask", response_model=ElsyiaTurnResponse)
+async def elsyia_ask(request: ElsyiaAskRequest):
+    """One text turn through the same Elsyia loop (no audio)."""
+    result = await get_elsyia_loop().handle_text(
         request.message,
         conversation_id=_conversation_uuid(request.conversation_id),
         confirmed=set(request.confirmed),
@@ -128,11 +128,11 @@ async def jev_ask(request: JevAskRequest):
 
 
 @router.get("/status")
-async def jev_status() -> dict[str, Any]:
+async def elsyia_status() -> dict[str, Any]:
     """Health of the whole voice loop: STT, LLM, TTS, OAuth, tools."""
     settings = get_settings()
     status: dict[str, Any] = {
-        "assistant": JEV_NAME,
+        "assistant": ELSYIA_NAME,
         "stt": {"ready": False},
         "llm": {"ready": False},
         "tts": {"ready": False},
@@ -196,21 +196,21 @@ async def wakeword_event() -> dict[str, Any]:
     """Poll for a wake event. Returns and clears it; {"wake": false} otherwise.
 
     The Electron shell polls this ~twice a second while the toggle is on and
-    summons the Jev overlay when a wake event arrives.
+    summons the Elsyia overlay when a wake event arrives.
     """
     return get_wakeword_service().take_event() or {"wake": False}
 
 
 @router.post("/wakeword/pause")
 async def wakeword_pause() -> dict[str, Any]:
-    """Suspend scoring while a Jev turn runs (so Jev's reply can't re-trigger)."""
+    """Suspend scoring while a Elsyia turn runs (so Elsyia's reply can't re-trigger)."""
     get_wakeword_service().pause()
     return get_wakeword_service().status()
 
 
 @router.post("/wakeword/resume")
 async def wakeword_resume() -> dict[str, Any]:
-    """Resume scoring after a Jev turn finishes."""
+    """Resume scoring after a Elsyia turn finishes."""
     get_wakeword_service().resume()
     return get_wakeword_service().status()
 
@@ -281,15 +281,15 @@ class DictateTypeRequest(BaseModel):
 
 
 @router.post("/dictate", response_model=DictateResponse)
-async def jev_dictate(audio: UploadFile = File(...)):
+async def elsyia_dictate(audio: UploadFile = File(...)):
     """One dictation pass: mic audio -> transcript -> cleaned text.
 
-    Stays silent — this never triggers Jev's spoken reply loop. The caller
+    Stays silent — this never triggers Elsyia's spoken reply loop. The caller
     pauses the wake-word listener while dictating.
     """
     import time as _time
 
-    from app.services.jev.dictation import cleanup_transcript
+    from app.services.elsyia.dictation import cleanup_transcript
 
     data = await audio.read()
     timings: dict[str, float] = {}
@@ -307,20 +307,20 @@ async def jev_dictate(audio: UploadFile = File(...)):
 
 
 @router.post("/dictate/cleanup")
-async def jev_dictate_cleanup(request: DictateCleanupRequest) -> dict[str, str]:
+async def elsyia_dictate_cleanup(request: DictateCleanupRequest) -> dict[str, str]:
     """Run just the Ollama cleanup pass over already-known text."""
-    from app.services.jev.dictation import cleanup_transcript
+    from app.services.elsyia.dictation import cleanup_transcript
 
     return {"cleaned": await cleanup_transcript(request.text)}
 
 
 @router.post("/dictate/type")
-async def jev_dictate_type(request: DictateTypeRequest) -> dict[str, Any]:
+async def elsyia_dictate_type(request: DictateTypeRequest) -> dict[str, Any]:
     """Type text into the currently focused application (pynput).
 
     The caller hides the overlay first so focus is back in the target app.
     """
-    from app.services.jev.dictation import DictationUnavailable, type_text_async
+    from app.services.elsyia.dictation import DictationUnavailable, type_text_async
 
     try:
         chars = await type_text_async(request.text)
@@ -332,9 +332,9 @@ async def jev_dictate_type(request: DictateTypeRequest) -> dict[str, Any]:
 
 
 @router.get("/dictation/status")
-async def jev_dictation_status() -> dict[str, Any]:
+async def elsyia_dictation_status() -> dict[str, Any]:
     """Dictation capability report: hotkey, confirm setting, typing support."""
-    from app.services.jev.dictation import dictation_status
+    from app.services.elsyia.dictation import dictation_status
 
     return dictation_status()
 
@@ -415,13 +415,13 @@ async def _agent_sse(coro_factory) -> Any:
 
 
 @router.get("/agent/status")
-async def jev_agent_status() -> dict[str, Any]:
+async def elsyia_agent_status() -> dict[str, Any]:
     """Agent-mode health: planner readiness, step caps, active plans."""
     return get_agent_runner().status()
 
 
 @router.get("/agent/{plan_id}")
-async def jev_agent_plan(plan_id: str) -> dict[str, Any]:
+async def elsyia_agent_plan(plan_id: str) -> dict[str, Any]:
     """Current state of one agent plan (for polling or recovery)."""
     from fastapi import HTTPException
 
@@ -432,19 +432,19 @@ async def jev_agent_plan(plan_id: str) -> dict[str, Any]:
 
 
 @router.post("/agent/{plan_id}/cancel")
-async def jev_agent_cancel(plan_id: str) -> dict[str, bool]:
+async def elsyia_agent_cancel(plan_id: str) -> dict[str, bool]:
     """Cancel a running or confirmation-paused plan."""
     return {"cancelled": get_agent_runner().cancel_plan(plan_id)}
 
 
 @router.post("/agent", response_model=AgentRunResponse)
-async def jev_agent_run(request: AgentRunRequest):
+async def elsyia_agent_run(request: AgentRunRequest):
     """Plan and execute a multi-step command.
 
     Pass stream=true for server-sent events with live per-step progress
     (plan_created, step_started, step_completed, awaiting_confirmation,
     plan_completed, plan_failed). Destructive steps pause for confirmation;
-    resume with POST /jev/agent/{plan_id}/confirm.
+    resume with POST /elsyia/agent/{plan_id}/confirm.
     """
     runner = get_agent_runner()
     confirmed = {c.strip() for c in request.confirmed if c.strip()}
@@ -460,7 +460,7 @@ async def jev_agent_run(request: AgentRunRequest):
 
 
 @router.post("/agent/{plan_id}/confirm")
-async def jev_agent_confirm(plan_id: str, request: AgentConfirmRequest):
+async def elsyia_agent_confirm(plan_id: str, request: AgentConfirmRequest):
     """Resume a confirmation- or input-paused plan.
 
     Pass {"user_input": "..."} to answer a plan paused with ask_user.
@@ -513,23 +513,23 @@ async def mcp_refresh() -> dict[str, Any]:
 # --- Screen-aware mode ("circle anything, then just ask") ---
 
 
-class JevSeeAskRequest(BaseModel):
+class ElsyiaSeeAskRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     capture_id: str | None = None
 
 
 @router.get("/see/status")
-async def jev_see_status() -> dict[str, Any]:
+async def elsyia_see_status() -> dict[str, Any]:
     """Vision pipeline health: model, Ollama, and whether a capture exists."""
     return await get_see_service().status()
 
 
 @router.post("/see/capture")
-async def jev_see_capture(file: UploadFile = File(...)) -> dict[str, Any]:
+async def elsyia_see_capture(file: UploadFile = File(...)) -> dict[str, Any]:
     """Store an explicit region capture.
 
     Called by the Electron shell right after the user's region select.
-    This is the ONLY endpoint that creates a capture — Jev never
+    This is the ONLY endpoint that creates a capture — Elsyia never
     screenshots on its own.
     """
     data = await file.read()
@@ -544,7 +544,7 @@ async def jev_see_capture(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 @router.post("/see")
-async def jev_see_ask(request: JevSeeAskRequest) -> dict[str, Any]:
+async def elsyia_see_ask(request: ElsyiaSeeAskRequest) -> dict[str, Any]:
     """Ask a question about the current explicit screen capture.
 
     Always returns 200 with an `ok` flag so the overlay can speak the
@@ -559,7 +559,7 @@ async def jev_see_ask(request: JevSeeAskRequest) -> dict[str, Any]:
     return {"ok": True, **result}
 
 
-# --- Voice picker (Jev's speaking voice, Jarvis-style) ---
+# --- Voice picker (Elsyia's speaking voice, Jarvis-style) ---
 
 
 class VoiceSelectRequest(BaseModel):
@@ -576,16 +576,16 @@ class VoiceDownloadRequest(BaseModel):
 
 
 @router.get("/voice/list")
-async def jev_voice_list() -> dict[str, Any]:
+async def elsyia_voice_list() -> dict[str, Any]:
     """All known Piper voices: installed ones, downloadable ones, active one."""
     return list_voices()
 
 
 @router.post("/voice/select")
-async def jev_voice_select(request: VoiceSelectRequest) -> dict[str, Any]:
-    """Switch Jev's speaking voice. Hot — no restart needed.
+async def elsyia_voice_select(request: VoiceSelectRequest) -> dict[str, Any]:
+    """Switch Elsyia's speaking voice. Hot — no restart needed.
 
-    The voice must already be downloaded (see POST /jev/voice/download).
+    The voice must already be downloaded (see POST /elsyia/voice/download).
     """
     try:
         active = select_voice(request.voice_id)
@@ -598,7 +598,7 @@ async def jev_voice_select(request: VoiceSelectRequest) -> dict[str, Any]:
 
 
 @router.post("/voice/preview")
-async def jev_voice_preview(request: VoicePreviewRequest) -> StreamingResponse:
+async def elsyia_voice_preview(request: VoicePreviewRequest) -> StreamingResponse:
     """Hear a sample line in a voice WITHOUT changing the active voice."""
     text = (request.text or PREVIEW_TEXT).strip() or PREVIEW_TEXT
     if len(text) > 400:
@@ -617,13 +617,13 @@ async def jev_voice_preview(request: VoicePreviewRequest) -> StreamingResponse:
 
 
 @router.post("/voice/download")
-async def jev_voice_download(request: VoiceDownloadRequest) -> StreamingResponse:
+async def elsyia_voice_download(request: VoiceDownloadRequest) -> StreamingResponse:
     """Download a Piper voice (explicit only). Streams SSE progress events.
 
     Events: ``progress`` {file, downloaded, total}, then ``done`` {voice}
     or ``error`` {error}.
     """
-    from app.services.jev.voice_picker import is_valid_voice_id, installed_voices
+    from app.services.elsyia.voice_picker import is_valid_voice_id, installed_voices
 
     voice_id = request.voice_id.strip()
     if not is_valid_voice_id(voice_id):

@@ -1,4 +1,4 @@
-"""Tests for the Jev wake-word listener.
+"""Tests for the Elsyia wake-word listener.
 
 The microphone and the keyword model are faked — no audio hardware, no
 model download, no network. The trigger wiring (detection -> wake event)
@@ -10,7 +10,7 @@ import time
 import numpy as np
 import pytest
 
-from app.services.jev.wakeword import (
+from app.services.elsyia.wakeword import (
     WakeWordConfig,
     WakeWordService,
     WakeWordUnavailable,

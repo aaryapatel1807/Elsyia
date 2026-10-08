@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 function settingsFile(): string {
-  return path.join(app.getPath("userData"), "jev-settings.json");
+  return path.join(app.getPath("userData"), "elsyia-settings.json");
 }
 
 function readAll(): Record<string, unknown> {
@@ -30,6 +30,6 @@ export function setSetting(key: string, value: unknown): void {
     fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
     fs.writeFileSync(settingsFile(), JSON.stringify(all, null, 2));
   } catch (err) {
-    console.error(`[Jev] failed to persist setting ${key}:`, err);
+    console.error(`[Elsyia] failed to persist setting ${key}:`, err);
   }
 }

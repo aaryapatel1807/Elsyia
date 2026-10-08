@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.jev.see import SeeUnavailable, get_see_service
+from app.services.elsyia.see import SeeUnavailable, get_see_service
 from app.services.tools.base import Tool, ToolError
 
 
@@ -22,7 +22,7 @@ class SeeCaptureTool(Tool):
         "Answer a question about the user's current screen capture. "
         "A capture exists ONLY right after the user pressed the "
         "screen-capture hotkey (Ctrl+Shift+S) and selected a region — "
-        "there is no other way a capture comes to exist, and Jev never "
+        "there is no other way a capture comes to exist, and Elsyia never "
         "screenshots in the background. Use when the user refers to "
         "'this', 'here', 'the screen', 'this error', or 'what's this'. "
         "If no capture exists, the tool says so — relay that plainly "

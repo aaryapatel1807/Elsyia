@@ -25,8 +25,8 @@ from app.services.sync.relay import create_relay_router
 from app.services.browser import browser_manager
 from app.services.tools.reminders import reminder_worker
 from app.services.voice.factory import get_stt_provider, get_tts_provider
-from app.services.jev.wakeword import get_wakeword_service
-from app.services.jev.mcp_client import get_mcp_manager
+from app.services.elsyia.wakeword import get_wakeword_service
+from app.services.elsyia.mcp_client import get_mcp_manager
 
 from app.core.logging import setup_logging
 

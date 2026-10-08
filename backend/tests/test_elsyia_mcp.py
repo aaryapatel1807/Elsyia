@@ -1,4 +1,4 @@
-"""Tests for the Jev MCP client.
+"""Tests for the Elsyia MCP client.
 
 Real MCP servers are faked at the transport seam (``MCPManager._open_session``)
 — no subprocesses, no network. The bridging logic (config parsing, tool
@@ -11,8 +11,8 @@ import json
 
 import pytest
 
-from app.services.jev import mcp_client
-from app.services.jev.mcp_client import (
+from app.services.elsyia import mcp_client
+from app.services.elsyia.mcp_client import (
     MCPManager,
     MCPServerConfig,
     MCPTool,
@@ -278,7 +278,7 @@ async def test_registry_execute_applies_confirm_gate(manager, monkeypatch):
 async def test_dead_server_degrades_gracefully(manager, monkeypatch):
     _patch_open(monkeypatch, manager, exc=ConnectionRefusedError("nope"))
     manager._configs = {"ghost": MCPServerConfig(name="ghost", command="dummy-server")}
-    # Must not raise: a dead server never breaks Jev.
+    # Must not raise: a dead server never breaks Elsyia.
     assert await manager._connect_server("ghost") is False
     assert "ghost" not in manager._sessions
     assert manager.status()["servers"]["ghost"]["available"] is False

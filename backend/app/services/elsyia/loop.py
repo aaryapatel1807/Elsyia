@@ -1,4 +1,4 @@
-"""Jev's real-time loop: the product's core.
+"""Elsyia's real-time loop: the product's core.
 
 One turn: optional STT -> intent routing -> tool execution -> Ollama
 reasoning -> spoken reply. Every stage is timed so latency can be
@@ -7,10 +7,10 @@ measured and engineered down.
 Design notes:
 - Deterministic intents run first (fast path, no LLM needed) for
   commands like "play X on YouTube" or "what time is it".
-- Everything else goes to the local LLM with the Jev persona.
+- Everything else goes to the local LLM with the Elsyia persona.
 - Destructive tools keep their confirmation gate: the turn returns
   `confirmation_required` and the caller re-sends with the tool name in
-  `confirmed` after Aarya approves. Jev has full permission to act —
+  `confirmed` after Aarya approves. Elsyia has full permission to act —
   confirmation is a safety rail, not a capability limit.
 """
 
@@ -29,16 +29,16 @@ from app.services.llm.factory import get_llm_provider
 from app.services.memory.consolidate import maybe_consolidate
 from app.services.memory.store import get_memory_store
 from app.services.tools.intent import looks_like_command, route_intent, route_with_llm
-from app.services.jev.persona import JEV_NAME, build_system_prompt
+from app.services.elsyia.persona import ELSYIA_NAME, build_system_prompt
 from app.services.llm.factory import get_llm_provider
 from app.services.tools.registry import registry
 from app.services.voice.factory import get_stt_provider
 
-logger = get_logger("jev.loop")
+logger = get_logger("elsyia.loop")
 
 
 @dataclass
-class JevTurnResult:
+class ElsyiaTurnResult:
     transcript: str = ""
     reply: str = ""
     conversation_id: str = ""
@@ -173,8 +173,8 @@ def _describe_tool_result(tool_name: str, result: Any) -> str:
     return "Done."
 
 
-class JevLoop:
-    """Runs Jev turns end to end with per-stage latency tracking."""
+class ElsyiaLoop:
+    """Runs Elsyia turns end to end with per-stage latency tracking."""
 
     def __init__(self) -> None:
         self._conversations = ConversationManager()
@@ -294,14 +294,14 @@ class JevLoop:
         text: str,
         conversation_id: UUID | None = None,
         confirmed: set[str] | None = None,
-    ) -> JevTurnResult:
+    ) -> ElsyiaTurnResult:
         """Run one text turn: intent -> tools -> LLM -> reply."""
         t_start = time.perf_counter()
         timings: dict[str, float] = {}
         confirmed_set = set(confirmed or ())
         text = (text or "").strip()
         if not text:
-            return JevTurnResult(reply="I didn't catch that.", timings_ms=timings)
+            return ElsyiaTurnResult(reply="I didn't catch that.", timings_ms=timings)
 
         conversation = self._conversations.get_or_create(conversation_id)
         self._conversations.add_message(
@@ -339,12 +339,12 @@ class JevLoop:
             actions.append(action)
             timings["tool_ms"] = (time.perf_counter() - t0) * 1000 - timings["nlu_ms"]
         else:
-            # Conversational path: local LLM with the Jev persona.
+            # Conversational path: local LLM with the Elsyia persona.
             t1 = time.perf_counter()
             try:
                 reply = await self._ask_llm(text, conversation.conversation_id)
             except Exception as exc:  # noqa: BLE001 — voice loop must not die
-                logger.error("Jev LLM call failed: %s", exc)
+                logger.error("Elsyia LLM call failed: %s", exc)
                 reply = (
                     "My local model isn't reachable right now. "
                     "Make sure Ollama is running and try again."
@@ -369,11 +369,11 @@ class JevLoop:
         except RuntimeError:
             pass  # no running loop (e.g. called from sync test harness)
         logger.info(
-            "Jev turn: intent=%s total_ms=%.0f",
+            "Elsyia turn: intent=%s total_ms=%.0f",
             intent_name,
             timings["total_ms"],
         )
-        return JevTurnResult(
+        return ElsyiaTurnResult(
             transcript=text,
             reply=reply,
             conversation_id=str(conversation.conversation_id),
@@ -387,7 +387,7 @@ class JevLoop:
         audio: bytes,
         conversation_id: UUID | None = None,
         confirmed: set[str] | None = None,
-    ) -> JevTurnResult:
+    ) -> ElsyiaTurnResult:
         """Run one voice turn: STT -> handle_text. TTS stays a client call."""
         t0 = time.perf_counter()
         stt = get_stt_provider()
@@ -399,11 +399,11 @@ class JevLoop:
         return result
 
 
-_jev_loop: JevLoop | None = None
+_elsyia_loop: ElsyiaLoop | None = None
 
 
-def get_jev_loop() -> JevLoop:
-    global _jev_loop
-    if _jev_loop is None:
-        _jev_loop = JevLoop()
-    return _jev_loop
+def get_elsyia_loop() -> ElsyiaLoop:
+    global _elsyia_loop
+    if _elsyia_loop is None:
+        _elsyia_loop = ElsyiaLoop()
+    return _elsyia_loop

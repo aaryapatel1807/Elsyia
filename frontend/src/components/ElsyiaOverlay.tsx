@@ -12,12 +12,12 @@ declare global {
   interface Window {
     elysia?: {
       version: string;
-      onJevSummon?: (cb: (info?: { wake: boolean; dictate?: boolean; see?: boolean; thumbnail?: string }) => void) => () => void;
-      hideJevOverlay?: () => void;
+      onElsyiaSummon?: (cb: (info?: { wake: boolean; dictate?: boolean; see?: boolean; thumbnail?: string }) => void) => () => void;
+      hideElsyiaOverlay?: () => void;
       setWakeWordPolling?: (enabled: boolean) => void;
       /** Fired when the wake-word switch changes elsewhere (e.g. tray menu). */
       onWakeWordState?: (cb: (on: boolean) => void) => () => void;
-      /** [jev-see] Region-select overlay: report the user-dragged
+      /** [elsyia-see] Region-select overlay: report the user-dragged
        * rectangle (CSS px). This is the only path that leads to a
        * screen capture. */
       selectSeeRegion?: (rect: {
@@ -26,13 +26,13 @@ declare global {
         width: number;
         height: number;
       }) => void;
-      /** [jev-see] Cancel the region select — no capture happens. */
+      /** [elsyia-see] Cancel the region select — no capture happens. */
       cancelSeeSelect?: () => void;
     };
   }
 }
 
-interface JevAction {
+interface ElsyiaAction {
   tool: string;
   status: string;
   confirmation_required: boolean;
@@ -40,12 +40,12 @@ interface JevAction {
   error?: string | null;
 }
 
-interface JevTurn {
+interface ElsyiaTurn {
   transcript: string;
   reply: string;
   conversation_id: string;
   intent: string;
-  actions: JevAction[];
+  actions: ElsyiaAction[];
   timings_ms: Record<string, number>;
 }
 
@@ -121,18 +121,18 @@ async function readAgentStream(
 }
 
 /**
- * Jev's summon overlay: the always-available voice interface.
+ * Elsyia's summon overlay: the always-available voice interface.
  * Toggled from anywhere with Ctrl+Shift+J. One tight loop —
- * hold to talk, release, Jev thinks and speaks back.
+ * hold to talk, release, Elsyia thinks and speaks back.
  */
-export default function JevOverlay() {
+export default function ElsyiaOverlay() {
   const [status, setStatus] = useState<AssistantStatus>("idle");
   const [transcript, setTranscript] = useState("");
   const [reply, setReply] = useState("");
-  const [actions, setActions] = useState<JevAction[]>([]);
+  const [actions, setActions] = useState<ElsyiaAction[]>([]);
   const [timings, setTimings] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<JevAction | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<ElsyiaAction | null>(null);
   const [wakeOn, setWakeOn] = useState(false);
   const [wakeModel, setWakeModel] = useState("hey jarvis");
   const [wakeAvailable, setWakeAvailable] = useState(true);
@@ -185,7 +185,7 @@ export default function JevOverlay() {
     setStatus("idle");
   }, []);
 
-  /** Soft two-tone chime played when the wake word summons Jev. */
+  /** Soft two-tone chime played when the wake word summons Elsyia. */
   const playWakeChime = useCallback(() => {
     try {
       const Ctx =
@@ -218,17 +218,17 @@ export default function JevOverlay() {
   const endWakeTurn = useCallback(() => {
     if (!wakeTurnRef.current) return;
     wakeTurnRef.current = false;
-    fetch(`${API_BASE}/jev/wakeword/resume`, { method: "POST" }).catch(() => {});
+    fetch(`${API_BASE}/elsyia/wakeword/resume`, { method: "POST" }).catch(() => {});
   }, []);
 
-  /** --- Dictation mode: say it, it types. Silent — Jev never speaks here. --- */
+  /** --- Dictation mode: say it, it types. Silent — Elsyia never speaks here. --- */
 
   const pauseWakeForDictation = useCallback(() => {
-    fetch(`${API_BASE}/jev/wakeword/pause`, { method: "POST" }).catch(() => {});
+    fetch(`${API_BASE}/elsyia/wakeword/pause`, { method: "POST" }).catch(() => {});
   }, []);
 
   const resumeWakeAfterDictation = useCallback(() => {
-    fetch(`${API_BASE}/jev/wakeword/resume`, { method: "POST" }).catch(() => {});
+    fetch(`${API_BASE}/elsyia/wakeword/resume`, { method: "POST" }).catch(() => {});
   }, []);
 
   const resetDictation = useCallback(() => {
@@ -251,7 +251,7 @@ export default function JevOverlay() {
     if (rec) void rec.stop().catch(() => {});
     resetDictation();
     resumeWakeAfterDictation();
-    window.elysia?.hideJevOverlay?.();
+    window.elysia?.hideElsyiaOverlay?.();
   }, [resetDictation, resumeWakeAfterDictation]);
 
   const typeDictation = useCallback(
@@ -264,9 +264,9 @@ export default function JevOverlay() {
       setDictateBusy(true);
       try {
         // Hide FIRST so OS focus returns to the target app, then type into it.
-        window.elysia?.hideJevOverlay?.();
+        window.elysia?.hideElsyiaOverlay?.();
         await new Promise((r) => setTimeout(r, 250));
-        const res = await fetch(`${API_BASE}/jev/dictate/type`, {
+        const res = await fetch(`${API_BASE}/elsyia/dictate/type`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: clean }),
@@ -303,7 +303,7 @@ export default function JevOverlay() {
       const audioBlob = await recorder.stop();
       const form = new FormData();
       form.append("audio", audioBlob, "dictate.webm");
-      const res = await fetch(`${API_BASE}/jev/dictate`, { method: "POST", body: form });
+      const res = await fetch(`${API_BASE}/elsyia/dictate`, { method: "POST", body: form });
       if (!res.ok) throw new Error(`Dictation failed: ${res.status}`);
       const data = (await res.json()) as { transcript?: string; cleaned?: string };
       const cleaned = (data.cleaned ?? "").trim();
@@ -424,7 +424,7 @@ export default function JevOverlay() {
       setSeeAnswer("");
       setStatus("thinking");
       try {
-        const res = await fetch(`${API_BASE}/jev/see`, {
+        const res = await fetch(`${API_BASE}/elsyia/see`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question: q }),
@@ -486,9 +486,9 @@ export default function JevOverlay() {
         if (conversationIdRef.current) form.append("conversation_id", conversationIdRef.current);
         if (confirmed.length > 0) form.append("confirmed", confirmed.join(","));
 
-        const res = await fetch(`${API_BASE}/jev/turn`, { method: "POST", body: form });
-        if (!res.ok) throw new Error(`Jev turn failed: ${res.status}`);
-        const turn = (await res.json()) as JevTurn;
+        const res = await fetch(`${API_BASE}/elsyia/turn`, { method: "POST", body: form });
+        if (!res.ok) throw new Error(`Elsyia turn failed: ${res.status}`);
+        const turn = (await res.json()) as ElsyiaTurn;
 
         conversationIdRef.current = turn.conversation_id;
         setTranscript(turn.transcript);
@@ -557,7 +557,7 @@ export default function JevOverlay() {
     try {
       // Re-run the same command with the tool confirmed. We re-send the
       // last transcript as a text turn to avoid re-recording audio.
-      const res = await fetch(`${API_BASE}/jev/ask`, {
+      const res = await fetch(`${API_BASE}/elsyia/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -567,7 +567,7 @@ export default function JevOverlay() {
         }),
       });
       if (!res.ok) throw new Error(`Confirm failed: ${res.status}`);
-      const turn = (await res.json()) as JevTurn;
+      const turn = (await res.json()) as ElsyiaTurn;
       setReply(turn.reply);
       setActions(turn.actions);
       setTimings(turn.timings_ms);
@@ -653,7 +653,7 @@ export default function JevOverlay() {
     setAgentBusy(true);
     setStatus("thinking");
     try {
-      const res = await fetch(`${API_BASE}/jev/agent`, {
+      const res = await fetch(`${API_BASE}/elsyia/agent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, stream: true }),
@@ -668,7 +668,7 @@ export default function JevOverlay() {
     }
   }, [agentInput, agentBusy, stopAll, handleAgentEvent]);
 
-  /** [jev-see] Hand the see-mode question to agent mode: the planner can
+  /** [elsyia-see] Hand the see-mode question to agent mode: the planner can
    * chain see_capture into real tools (e.g. send_gmail) with its
    * normal confirm gates. */
   const doItWithAgent = useCallback(() => {
@@ -685,7 +685,7 @@ export default function JevOverlay() {
     setAgentPending(null);
     setStatus("thinking");
     try {
-      const res = await fetch(`${API_BASE}/jev/agent/${planId}/confirm`, {
+      const res = await fetch(`${API_BASE}/elsyia/agent/${planId}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmed: [tool], stream: true }),
@@ -702,7 +702,7 @@ export default function JevOverlay() {
   const denyAgentRun = useCallback(async () => {
     if (!agentPending) return;
     try {
-      await fetch(`${API_BASE}/jev/agent/${agentPending.planId}/cancel`, {
+      await fetch(`${API_BASE}/elsyia/agent/${agentPending.planId}/cancel`, {
         method: "POST",
       });
     } catch {
@@ -717,7 +717,7 @@ export default function JevOverlay() {
   // A wake-word summon arrives with { wake: true }: chime, then listen hands-free.
   // A dictation summon arrives with { dictate: true }: toggle record/stop/type.
   useEffect(() => {
-    const off = window.elysia?.onJevSummon?.((info) => {
+    const off = window.elysia?.onElsyiaSummon?.((info) => {
       if (info?.dictate) {
         toggleDictation();
         return;
@@ -758,7 +758,7 @@ export default function JevOverlay() {
         if (status === "listening") void stopListeningAndRespond();
         else {
           stopAll();
-          window.elysia?.hideJevOverlay?.();
+          window.elysia?.hideElsyiaOverlay?.();
         }
       }
     };
@@ -784,7 +784,7 @@ export default function JevOverlay() {
 
   // Wake-word toggle: explicit opt-in for the always-on listener.
   useEffect(() => {
-    fetch(`${API_BASE}/jev/wakeword/status`)
+    fetch(`${API_BASE}/elsyia/wakeword/status`)
       .then((r) => (r.ok ? r.json() : null))
       .then((s: { enabled?: boolean; model?: string; available?: boolean } | null) => {
         if (!s) return;
@@ -801,7 +801,7 @@ export default function JevOverlay() {
 
   // Dictation capability: confirm-preview setting + whether typing works here.
   useEffect(() => {
-    fetch(`${API_BASE}/jev/dictation/status`)
+    fetch(`${API_BASE}/elsyia/dictation/status`)
       .then((r) => (r.ok ? r.json() : null))
       .then(
         (s: { confirm?: boolean; typing_available?: boolean } | null) => {
@@ -819,7 +819,7 @@ export default function JevOverlay() {
     const next = !wakeOn;
     try {
       const res = await fetch(
-        `${API_BASE}/jev/wakeword/${next ? "enable" : "disable"}`,
+        `${API_BASE}/elsyia/wakeword/${next ? "enable" : "disable"}`,
         { method: "POST" }
       );
       if (!res.ok) {
@@ -848,17 +848,17 @@ export default function JevOverlay() {
   const totalMs = timings.total_ms;
   const orbClass =
     status === "listening"
-      ? "jev-orb-listening"
+      ? "elsyia-orb-listening"
       : status === "thinking"
-        ? "jev-orb-thinking"
+        ? "elsyia-orb-thinking"
         : status === "speaking"
-          ? "jev-orb-speaking"
-          : "jev-orb-idle";
+          ? "elsyia-orb-speaking"
+          : "elsyia-orb-idle";
 
   return (
-    <div className="jev-overlay">
+    <div className="elsyia-overlay">
       <style>{`
-        .jev-overlay {
+        .elsyia-overlay {
           width: 100vw; height: 100vh; display: flex; flex-direction: column;
           align-items: center; justify-content: flex-start;
           background: rgba(8, 8, 14, 0.82); backdrop-filter: blur(28px);
@@ -867,94 +867,94 @@ export default function JevOverlay() {
           padding: 28px 24px; box-sizing: border-box; overflow: hidden;
           -webkit-app-region: drag;
         }
-        .jev-overlay button { -webkit-app-region: no-drag; }
-        .jev-title { font-size: 13px; letter-spacing: 0.32em; color: #9a9ab0; margin-bottom: 18px; }
-        .jev-orb { width: 128px; height: 128px; border-radius: 50%; margin: 6px 0 18px;
+        .elsyia-overlay button { -webkit-app-region: no-drag; }
+        .elsyia-title { font-size: 13px; letter-spacing: 0.32em; color: #9a9ab0; margin-bottom: 18px; }
+        .elsyia-orb { width: 128px; height: 128px; border-radius: 50%; margin: 6px 0 18px;
           transition: box-shadow 0.4s ease, transform 0.4s ease; }
-        .jev-orb-idle { background: radial-gradient(circle at 35% 35%, #3b3b58, #15151f);
+        .elsyia-orb-idle { background: radial-gradient(circle at 35% 35%, #3b3b58, #15151f);
           box-shadow: 0 0 42px rgba(120,120,200,0.25); }
-        .jev-orb-listening { background: radial-gradient(circle at 35% 35%, #4f7cff, #1b2a6b);
+        .elsyia-orb-listening { background: radial-gradient(circle at 35% 35%, #4f7cff, #1b2a6b);
           box-shadow: 0 0 64px rgba(90,140,255,0.65); transform: scale(1.06);
-          animation: jev-pulse 1.4s ease-in-out infinite; }
-        .jev-orb-thinking { background: radial-gradient(circle at 35% 35%, #a06bff, #3a1f6e);
-          box-shadow: 0 0 64px rgba(160,110,255,0.6); animation: jev-spin 2.4s linear infinite; }
-        .jev-orb-speaking { background: radial-gradient(circle at 35% 35%, #37e0a0, #0e5c3d);
-          box-shadow: 0 0 64px rgba(60,224,160,0.55); animation: jev-pulse 0.9s ease-in-out infinite; }
-        @keyframes jev-pulse { 0%,100% { transform: scale(1.04);} 50% { transform: scale(1.12);} }
-        @keyframes jev-spin { from { filter: hue-rotate(0deg);} to { filter: hue-rotate(360deg);} }
-        .jev-status { font-size: 12px; letter-spacing: 0.22em; color: #8b8ba3; text-transform: uppercase; min-height: 18px; }
-        .jev-text { width: 100%; margin-top: 14px; max-height: 220px; overflow-y: auto; }
-        .jev-transcript { font-size: 13px; color: #9a9ab0; font-style: italic; margin-bottom: 8px; }
-        .jev-reply { font-size: 16px; line-height: 1.55; color: #f2f2f5; }
-        .jev-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-        .jev-chip { font-size: 11px; letter-spacing: 0.08em; padding: 5px 12px; border-radius: 999px;
+          animation: elsyia-pulse 1.4s ease-in-out infinite; }
+        .elsyia-orb-thinking { background: radial-gradient(circle at 35% 35%, #a06bff, #3a1f6e);
+          box-shadow: 0 0 64px rgba(160,110,255,0.6); animation: elsyia-spin 2.4s linear infinite; }
+        .elsyia-orb-speaking { background: radial-gradient(circle at 35% 35%, #37e0a0, #0e5c3d);
+          box-shadow: 0 0 64px rgba(60,224,160,0.55); animation: elsyia-pulse 0.9s ease-in-out infinite; }
+        @keyframes elsyia-pulse { 0%,100% { transform: scale(1.04);} 50% { transform: scale(1.12);} }
+        @keyframes elsyia-spin { from { filter: hue-rotate(0deg);} to { filter: hue-rotate(360deg);} }
+        .elsyia-status { font-size: 12px; letter-spacing: 0.22em; color: #8b8ba3; text-transform: uppercase; min-height: 18px; }
+        .elsyia-text { width: 100%; margin-top: 14px; max-height: 220px; overflow-y: auto; }
+        .elsyia-transcript { font-size: 13px; color: #9a9ab0; font-style: italic; margin-bottom: 8px; }
+        .elsyia-reply { font-size: 16px; line-height: 1.55; color: #f2f2f5; }
+        .elsyia-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .elsyia-chip { font-size: 11px; letter-spacing: 0.08em; padding: 5px 12px; border-radius: 999px;
           background: rgba(120,140,255,0.14); border: 1px solid rgba(120,140,255,0.35); color: #b9c6ff; }
-        .jev-timing { margin-top: 10px; font-size: 11px; color: #6d6d85; letter-spacing: 0.06em; }
-        .jev-error { margin-top: 10px; font-size: 13px; color: #ff9d9d; }
-        .jev-ptt { margin-top: auto; width: 100%; padding: 14px; border-radius: 16px; border: none;
+        .elsyia-timing { margin-top: 10px; font-size: 11px; color: #6d6d85; letter-spacing: 0.06em; }
+        .elsyia-error { margin-top: 10px; font-size: 13px; color: #ff9d9d; }
+        .elsyia-ptt { margin-top: auto; width: 100%; padding: 14px; border-radius: 16px; border: none;
           font-size: 15px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer;
           background: linear-gradient(135deg, #4f7cff, #8a5cff); color: white; }
-        .jev-ptt:active { transform: scale(0.98); }
-        .jev-confirm { display: flex; gap: 10px; width: 100%; margin-top: 12px; }
-        .jev-confirm button { flex: 1; padding: 12px; border-radius: 14px; border: none;
+        .elsyia-ptt:active { transform: scale(0.98); }
+        .elsyia-confirm { display: flex; gap: 10px; width: 100%; margin-top: 12px; }
+        .elsyia-confirm button { flex: 1; padding: 12px; border-radius: 14px; border: none;
           font-size: 14px; font-weight: 600; cursor: pointer; }
-        .jev-confirm-yes { background: #2fbf71; color: #06130c; }
-        .jev-confirm-no { background: rgba(255,255,255,0.1); color: #f2f2f5; }
-        .jev-hint { margin-top: 10px; font-size: 11px; color: #6d6d85; }
-        .jev-rec { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+        .elsyia-confirm-yes { background: #2fbf71; color: #06130c; }
+        .elsyia-confirm-no { background: rgba(255,255,255,0.1); color: #f2f2f5; }
+        .elsyia-hint { margin-top: 10px; font-size: 11px; color: #6d6d85; }
+        .elsyia-rec { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
           background: #ff5d5d; margin-right: 8px;
           box-shadow: 0 0 12px rgba(255,93,93,0.8);
-          animation: jev-pulse 1s ease-in-out infinite; }
-        .jev-ptt-rec { background: linear-gradient(135deg, #e05252, #b03030); }
-        .jev-dictate-preview { width: 100%; margin-top: 14px; padding: 14px;
+          animation: elsyia-pulse 1s ease-in-out infinite; }
+        .elsyia-ptt-rec { background: linear-gradient(135deg, #e05252, #b03030); }
+        .elsyia-dictate-preview { width: 100%; margin-top: 14px; padding: 14px;
           border-radius: 16px; background: rgba(120,140,255,0.08);
           border: 1px solid rgba(120,140,255,0.25); box-sizing: border-box;
           -webkit-app-region: no-drag; }
-        .jev-dictate-label { font-size: 11px; letter-spacing: 0.22em; color: #8b8ba3;
+        .elsyia-dictate-label { font-size: 11px; letter-spacing: 0.22em; color: #8b8ba3;
           text-transform: uppercase; margin-bottom: 8px; }
-        .jev-dictate-text { font-size: 15px; line-height: 1.55; color: #f2f2f5;
+        .elsyia-dictate-text { font-size: 15px; line-height: 1.55; color: #f2f2f5;
           max-height: 150px; overflow-y: auto; margin-bottom: 4px; }
-        .jev-wake { width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+        .elsyia-wake { width: 100%; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
           background: rgba(120,140,255,0.07); border: 1px solid rgba(120,140,255,0.18);
           box-sizing: border-box; -webkit-app-region: no-drag; }
-        .jev-wake-label { display: flex; align-items: center; gap: 10px; font-size: 12px;
+        .elsyia-wake-label { display: flex; align-items: center; gap: 10px; font-size: 12px;
           color: #b9c6ff; cursor: pointer; letter-spacing: 0.04em; }
-        .jev-wake-warn { margin-top: 6px; font-size: 11px; color: #ff9d9d; }
-        .jev-agent { width: 100%; margin-top: 12px; -webkit-app-region: no-drag; }
-        .jev-agent-toggle { background: none; border: none; color: #8b8ba3;
+        .elsyia-wake-warn { margin-top: 6px; font-size: 11px; color: #ff9d9d; }
+        .elsyia-agent { width: 100%; margin-top: 12px; -webkit-app-region: no-drag; }
+        .elsyia-agent-toggle { background: none; border: none; color: #8b8ba3;
           font-size: 12px; letter-spacing: 0.06em; cursor: pointer; padding: 4px 0; }
-        .jev-agent-panel { margin-top: 8px; padding: 12px; border-radius: 12px;
+        .elsyia-agent-panel { margin-top: 8px; padding: 12px; border-radius: 12px;
           background: rgba(120,140,255,0.07); border: 1px solid rgba(120,140,255,0.18);
           box-sizing: border-box; }
-        .jev-agent-row { display: flex; gap: 8px; }
-        .jev-agent-input { flex: 1; background: rgba(255,255,255,0.06);
+        .elsyia-agent-row { display: flex; gap: 8px; }
+        .elsyia-agent-input { flex: 1; background: rgba(255,255,255,0.06);
           border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
           color: #f2f2f5; padding: 10px 12px; font-size: 13px; outline: none;
           -webkit-app-region: no-drag; }
-        .jev-agent-run { padding: 10px 16px; border-radius: 10px; border: none;
+        .elsyia-agent-run { padding: 10px 16px; border-radius: 10px; border: none;
           font-weight: 600; cursor: pointer;
           background: linear-gradient(135deg, #4f7cff, #8a5cff); color: white; }
-        .jev-agent-run:disabled { opacity: 0.5; cursor: default; }
-        /* [jev-see] Screen-aware mode: reuses the overlay's panel/input/
+        .elsyia-agent-run:disabled { opacity: 0.5; cursor: default; }
+        /* [elsyia-see] Screen-aware mode: reuses the overlay's panel/input/
            chip language — thumbnail preview, privacy microcopy, Q&A row. */
-        .jev-see { width: 100%; margin-top: 14px; -webkit-app-region: no-drag; }
-        .jev-see-thumb { padding: 12px; border-radius: 16px;
+        .elsyia-see { width: 100%; margin-top: 14px; -webkit-app-region: no-drag; }
+        .elsyia-see-thumb { padding: 12px; border-radius: 16px;
           background: rgba(120,140,255,0.08);
           border: 1px solid rgba(120,140,255,0.25); box-sizing: border-box; }
-        .jev-see-thumb img { width: 100%; border-radius: 10px; display: block;
+        .elsyia-see-thumb img { width: 100%; border-radius: 10px; display: block;
           margin-top: 8px; }
-        .jev-see-privacy { margin-top: 8px; font-size: 11px; color: #6d6d85;
+        .elsyia-see-privacy { margin-top: 8px; font-size: 11px; color: #6d6d85;
           letter-spacing: 0.06em; }
-        .jev-see-row { display: flex; gap: 8px; margin-top: 10px; }
-        .jev-chip-btn { cursor: pointer; font: inherit; }
+        .elsyia-see-row { display: flex; gap: 8px; margin-top: 10px; }
+        .elsyia-chip-btn { cursor: pointer; font: inherit; }
       `}</style>
 
-      <div className="jev-title">JEV</div>
-      <div className={`jev-orb ${orbClass}`} />
-      <div className="jev-status">
+      <div className="elsyia-title">ELSYIA</div>
+      <div className={`elsyia-orb ${orbClass}`} />
+      <div className="elsyia-status">
         {dictateMode && dictateRecording && (
           <span>
-            <span className="jev-rec" />
+            <span className="elsyia-rec" />
             dictating — hotkey to finish · Esc cancels
           </span>
         )}
@@ -967,13 +967,13 @@ export default function JevOverlay() {
         {!dictateMode && status === "speaking" && "speaking…"}
       </div>
 
-      <div className="jev-text">
-        {transcript && <div className="jev-transcript">“{transcript}”</div>}
-        {reply && <div className="jev-reply">{reply}</div>}
+      <div className="elsyia-text">
+        {transcript && <div className="elsyia-transcript">“{transcript}”</div>}
+        {reply && <div className="elsyia-reply">{reply}</div>}
         {actions.length > 0 && (
-          <div className="jev-chips">
+          <div className="elsyia-chips">
             {actions.map((a, i) => (
-              <span key={i} className="jev-chip">
+              <span key={i} className="elsyia-chip">
                 {ACTION_LABELS[a.tool] ?? a.tool}
                 {a.status === "error" ? " · failed" : ""}
                 {a.confirmation_required ? " · confirm?" : ""}
@@ -982,26 +982,26 @@ export default function JevOverlay() {
           </div>
         )}
         {typeof totalMs === "number" && (
-          <div className="jev-timing">answered in {(totalMs / 1000).toFixed(1)}s</div>
+          <div className="elsyia-timing">answered in {(totalMs / 1000).toFixed(1)}s</div>
         )}
-        {error && <div className="jev-error">{error}</div>}
+        {error && <div className="elsyia-error">{error}</div>}
       </div>
 
       {seeMode ? (
-        <div className="jev-see">
+        <div className="elsyia-see">
           {seeThumb && (
-            <div className="jev-see-thumb">
-              <div className="jev-dictate-label">screen capture</div>
+            <div className="elsyia-see-thumb">
+              <div className="elsyia-dictate-label">screen capture</div>
               <img src={seeThumb} alt="Selected screen region" />
-              <div className="jev-see-privacy">Jev only looks when you ask.</div>
+              <div className="elsyia-see-privacy">Elsyia only looks when you ask.</div>
             </div>
           )}
-          <div className="jev-dictate-label" style={{ marginTop: 12 }}>
+          <div className="elsyia-dictate-label" style={{ marginTop: 12 }}>
             what about it?
           </div>
-          <div className="jev-see-row">
+          <div className="elsyia-see-row">
             <input
-              className="jev-agent-input"
+              className="elsyia-agent-input"
               value={seeQuestion}
               onChange={(e) => setSeeQuestion(e.target.value)}
               onKeyDown={(e) => {
@@ -1012,39 +1012,39 @@ export default function JevOverlay() {
               aria-label="Question about the screen capture"
             />
             <button
-              className="jev-agent-run"
+              className="elsyia-agent-run"
               onClick={() => void askSee(seeQuestion)}
               disabled={seeBusy || !seeQuestion.trim()}
             >
               {seeBusy ? "…" : "Ask"}
             </button>
           </div>
-          <div className="jev-see-row">
+          <div className="elsyia-see-row">
             <button
-              className="jev-chip jev-chip-btn"
+              className="elsyia-chip elsyia-chip-btn"
               onClick={() => void askSeeByVoice()}
               disabled={seeBusy}
             >
               {seeVoiceAsking ? "Stop & ask" : "Ask by voice"}
             </button>
-            <button className="jev-chip jev-chip-btn" onClick={exitSeeMode}>
+            <button className="elsyia-chip elsyia-chip-btn" onClick={exitSeeMode}>
               Close
             </button>
           </div>
           {seeAnswer && (
-            <div className="jev-reply" style={{ marginTop: 12 }}>
+            <div className="elsyia-reply" style={{ marginTop: 12 }}>
               {seeAnswer}
             </div>
           )}
           {seeMs != null && (
-            <div className="jev-timing">
+            <div className="elsyia-timing">
               answered in {(seeMs / 1000).toFixed(1)}s
             </div>
           )}
           {seeAnswer && seeOk && (
-            <div className="jev-chips">
+            <div className="elsyia-chips">
               <button
-                className="jev-chip jev-chip-btn"
+                className="elsyia-chip elsyia-chip-btn"
                 onClick={doItWithAgent}
                 disabled={!seeQuestion.trim()}
               >
@@ -1056,43 +1056,43 @@ export default function JevOverlay() {
       ) : dictateMode ? (
         <>
           {dictateText && !dictateRecording && !dictateBusy && (
-            <div className="jev-dictate-preview">
-              <div className="jev-dictate-label">cleaned & ready to type</div>
-              <div className="jev-dictate-text">{dictateText}</div>
-              <div className="jev-confirm">
+            <div className="elsyia-dictate-preview">
+              <div className="elsyia-dictate-label">cleaned & ready to type</div>
+              <div className="elsyia-dictate-text">{dictateText}</div>
+              <div className="elsyia-confirm">
                 <button
-                  className="jev-confirm-yes"
+                  className="elsyia-confirm-yes"
                   onClick={() => void typeDictation(dictateText)}
                 >
                   Type it
                 </button>
-                <button className="jev-confirm-no" onClick={() => void startDictation()}>
+                <button className="elsyia-confirm-no" onClick={() => void startDictation()}>
                   Re-record
                 </button>
-                <button className="jev-confirm-no" onClick={() => void cancelDictation()}>
+                <button className="elsyia-confirm-no" onClick={() => void cancelDictation()}>
                   Cancel
                 </button>
               </div>
             </div>
           )}
           {dictateRecording && (
-            <button className="jev-ptt jev-ptt-rec" onClick={() => void finishDictation()}>
+            <button className="elsyia-ptt elsyia-ptt-rec" onClick={() => void finishDictation()}>
               Stop & clean up
             </button>
           )}
           {!dictateAvailable && (
-            <div className="jev-wake-warn">
+            <div className="elsyia-wake-warn">
               typing needs the pynput package on the backend
             </div>
           )}
         </>
       ) : pendingConfirm ? (
-        <div className="jev-confirm">
-          <button className="jev-confirm-yes" onClick={() => void confirmAction()}>
+        <div className="elsyia-confirm">
+          <button className="elsyia-confirm-yes" onClick={() => void confirmAction()}>
             Yes, do it
           </button>
           <button
-            className="jev-confirm-no"
+            className="elsyia-confirm-no"
             onClick={() => {
               setPendingConfirm(null);
               setReply("Understood — I won't do that.");
@@ -1104,18 +1104,18 @@ export default function JevOverlay() {
         </div>
       ) : (
         <button
-          className="jev-ptt"
+          className="elsyia-ptt"
           onMouseDown={() => void startListening()}
           onMouseUp={() => void stopListeningAndRespond()}
           onMouseLeave={() => {
             if (status === "listening") void stopListeningAndRespond();
           }}
         >
-          {status === "listening" ? "Release to send" : "Hold to talk to Jev"}
+          {status === "listening" ? "Release to send" : "Hold to talk to Elsyia"}
         </button>
       )}
-      <div className="jev-wake">
-        <label className="jev-wake-label">
+      <div className="elsyia-wake">
+        <label className="elsyia-wake-label">
           <input
             type="checkbox"
             checked={wakeOn}
@@ -1125,18 +1125,18 @@ export default function JevOverlay() {
           <span>Wake word · “{wakeModel}”</span>
         </label>
         {!wakeAvailable && (
-          <div className="jev-wake-warn">listener unavailable on this machine</div>
+          <div className="elsyia-wake-warn">listener unavailable on this machine</div>
         )}
       </div>
-      <div className="jev-agent">
-        <button className="jev-agent-toggle" onClick={() => setAgentMode((m) => !m)}>
+      <div className="elsyia-agent">
+        <button className="elsyia-agent-toggle" onClick={() => setAgentMode((m) => !m)}>
           {agentMode ? "▾ Agent mode" : "▸ Agent mode — several things at once"}
         </button>
         {agentMode && (
-          <div className="jev-agent-panel">
-            <div className="jev-agent-row">
+          <div className="elsyia-agent-panel">
+            <div className="elsyia-agent-row">
               <input
-                className="jev-agent-input"
+                className="elsyia-agent-input"
                 value={agentInput}
                 onChange={(e) => setAgentInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1147,7 +1147,7 @@ export default function JevOverlay() {
                 aria-label="Agent mode command"
               />
               <button
-                className="jev-agent-run"
+                className="elsyia-agent-run"
                 onClick={() => void runAgent()}
                 disabled={agentBusy || !agentInput.trim()}
               >
@@ -1155,9 +1155,9 @@ export default function JevOverlay() {
               </button>
             </div>
             {agentSteps.length > 0 && (
-              <div className="jev-chips">
+              <div className="elsyia-chips">
                 {agentSteps.map((s) => (
-                  <span key={s.seq} className="jev-chip">
+                  <span key={s.seq} className="elsyia-chip">
                     {s.say}{" "}
                     {s.status === "completed"
                       ? "✓"
@@ -1176,16 +1176,16 @@ export default function JevOverlay() {
             )}
             {agentPending && (
               <>
-                <div className="jev-hint">{agentPending.message}</div>
-                <div className="jev-confirm">
+                <div className="elsyia-hint">{agentPending.message}</div>
+                <div className="elsyia-confirm">
                   <button
-                    className="jev-confirm-yes"
+                    className="elsyia-confirm-yes"
                     onClick={() => void confirmAgentRun()}
                   >
                     Yes, continue
                   </button>
                   <button
-                    className="jev-confirm-no"
+                    className="elsyia-confirm-no"
                     onClick={() => void denyAgentRun()}
                   >
                     No
@@ -1196,7 +1196,7 @@ export default function JevOverlay() {
           </div>
         )}
       </div>
-      <div className="jev-hint">
+      <div className="elsyia-hint">
         Ctrl+Shift+J summon · Ctrl+Shift+D dictate · Esc dismiss
       </div>
     </div>

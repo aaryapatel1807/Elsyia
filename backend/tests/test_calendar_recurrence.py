@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from app.services.jev.calendar import (
+from app.services.elsyia.calendar import (
     CreateRecurringCalendarEventTool,
     build_recurrence_rule,
 )
@@ -115,7 +115,7 @@ class _FakeGcsaCalendar:
 
 @pytest.mark.asyncio()
 async def test_recurring_tool_run_uses_gcsa(monkeypatch):
-    import app.services.jev.calendar as cal
+    import app.services.elsyia.calendar as cal
 
     monkeypatch.setattr(cal, "_require_connected", lambda: None)
     fake = _FakeGcsaCalendar()
@@ -139,7 +139,7 @@ async def test_recurring_tool_run_uses_gcsa(monkeypatch):
 
 @pytest.mark.asyncio()
 async def test_recurring_tool_rejects_bad_recurrence(monkeypatch):
-    import app.services.jev.calendar as cal
+    import app.services.elsyia.calendar as cal
 
     monkeypatch.setattr(cal, "_require_connected", lambda: None)
 

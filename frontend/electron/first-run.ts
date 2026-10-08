@@ -1,7 +1,7 @@
 /**
  * first-run.ts — Ollama reachability check + friendly setup screen.
  *
- * Jev's AI brain is Ollama, which is deliberately NOT bundled (multi-GB
+ * Elsyia's AI brain is Ollama, which is deliberately NOT bundled (multi-GB
  * model weights). On launch we check http://localhost:11434; if it is
  * unreachable we show a setup window guiding the user to install Ollama
  * and pull a model, instead of a mysteriously brain-dead assistant.
@@ -26,7 +26,7 @@ export async function isOllamaReachable(): Promise<boolean> {
 const SETUP_HTML = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Set up Jev</title>
+<title>Set up Elsyia</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, "Segoe UI", Inter, sans-serif;
@@ -55,14 +55,14 @@ const SETUP_HTML = `<!DOCTYPE html>
   #status.ok { color: #4ade80; } #status.err { color: #f87171; }
 </style></head><body>
   <div class="ring">J</div>
-  <h1>One last step to wake Jev up</h1>
-  <p class="sub">Jev's brain runs on Ollama, free and entirely on your machine.
+  <h1>One last step to wake Elsyia up</h1>
+  <p class="sub">Elsyia's brain runs on Ollama, free and entirely on your machine.
   It is not bundled with the app because the model weights are several gigabytes.
   Two minutes, once:</p>
   <div class="step"><h2>1. Install Ollama</h2>
     <p>Download it from <a href="https://ollama.com/download" id="ollama-link">ollama.com/download</a>
     and run the installer.</p></div>
-  <div class="step"><h2>2. Pull Jev's model</h2>
+  <div class="step"><h2>2. Pull Elsyia's model</h2>
     <p>Open a terminal and run:</p>
     <code id="cmd">ollama pull ${OLLAMA_MODEL}</code>
     <div class="row"><button class="ghost" id="copy">Copy command</button></div></div>
@@ -86,7 +86,7 @@ const SETUP_HTML = `<!DOCTYPE html>
   });
   api.onSetupStatus((ok) => {
     const el = document.getElementById('status');
-    if (ok) { el.textContent = 'Ollama found — starting Jev…'; el.className = 'ok'; }
+    if (ok) { el.textContent = 'Ollama found — starting Elsyia…'; el.className = 'ok'; }
     else { el.textContent = 'Still cannot reach Ollama. Is it installed and running?'; el.className = 'err'; }
   });
 </script></body></html>`;
@@ -117,9 +117,9 @@ export function showSetupWindow(preloadPath: string, onReady: () => void): void 
     setupWin = null;
   });
 
-  ipcMain.once("jev-setup-retry", async () => {
+  ipcMain.once("elsyia-setup-retry", async () => {
     const ok = await isOllamaReachable();
-    setupWin?.webContents.send("jev-setup-status", ok);
+    setupWin?.webContents.send("elsyia-setup-status", ok);
     if (ok) {
       setupWin?.close();
       onReady();

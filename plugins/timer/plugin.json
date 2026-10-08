@@ -1,8 +1,8 @@
 {
-  "id": "jev-timer",
-  "name": "Jev Timer",
+  "id": "elsyia-timer",
+  "name": "Elsyia Timer",
   "version": "1.0.0",
-  "description": "Voice timers: 'Jev, set a timer for 10 minutes called pasta'. Implemented on the local reminder store so timers survive restarts.",
+  "description": "Voice timers: 'Elsyia, set a timer for 10 minutes called pasta'. Implemented on the local reminder store so timers survive restarts.",
   "entrypoint": "backend/app/services/tools/integrations/productivity.py:SetTimerTool",
   "tools": ["set_timer"],
   "voice_triggers": ["set a timer for {n} minutes", "set a timer for {n} minutes called {label}"],

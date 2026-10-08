@@ -154,10 +154,10 @@ async def deliver_reminder(reminder: dict[str, Any]) -> None:
     except ImportError:
         notifier = None
     else:
-        notifier = DesktopNotifier(app_name="Jev")
+        notifier = DesktopNotifier(app_name="Elsyia")
     if notifier is not None:
         try:
-            await notifier.send(title="Jev reminder", message=title)
+            await notifier.send(title="Elsyia reminder", message=title)
             return
         except Exception as exc:  # noqa: BLE001 — fall through to msg.exe
             logger.debug("desktop-notifier delivery failed: %s", exc)

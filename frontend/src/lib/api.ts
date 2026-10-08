@@ -8,7 +8,7 @@
  */
 
 // NOTE: the full window.elysia bridge shape is declared in
-// components/JevOverlay.tsx; this file uses a local structural type so the
+// components/ElsyiaOverlay.tsx; this file uses a local structural type so the
 // two global augmentations can never clash.
 interface ElysiaBridge {
   backendUrl?: () => string;
