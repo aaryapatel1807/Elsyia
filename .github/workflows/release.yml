@@ -68,7 +68,7 @@ jobs:
         shell: bash
         run: |
           cd backend
-          uv run --no-sync python -m PyInstaller --noconfirm --clean jev-backend.spec
+          uv run --no-sync python -m PyInstaller --noconfirm --clean elsyia-backend.spec
 
       - name: Set up Node
         uses: actions/setup-node@v4
