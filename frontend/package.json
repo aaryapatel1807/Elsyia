@@ -72,12 +72,12 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "appx": {
-      "identityName": "AaryaPatel.Jev",
-      "publisher": "CN=PLACEHOLDER-FROM-PARTNER-CENTER",
+      "identityName": "AaryaPatel.ELSYIA",
+      "publisher": "CN=7D2ABDC7-5DC1-4BBE-8123-8BEBA39D2DFE",
       "publisherDisplayName": "Aarya Patel",
-      "applicationId": "Jev",
-      "displayName": "Jev",
-      "description": "Jev — your local voice assistant",
+      "applicationId": "Elsyia",
+      "displayName": "Elsyia",
+      "description": "Elsyia — your local voice assistant",
       "backgroundColor": "#1a1a2e",
       "languages": ["en-US"]
     },
