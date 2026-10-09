@@ -51,6 +51,8 @@ interface ElsyiaTurn {
 
 const ACTION_LABELS: Record<string, string> = {
   play_youtube: "YouTube",
+  show_instagram_reels: "Instagram",
+  describe_instagram_reel: "Instagram",
   media_control: "Media",
   message_whatsapp: "WhatsApp",
   open_linkedin: "LinkedIn",
