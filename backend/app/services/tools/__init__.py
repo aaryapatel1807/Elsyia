@@ -72,6 +72,7 @@ from app.services.elsyia.gmail import (
     SendGmailTool,
 )
 from app.services.tools.integrations import (
+    DescribeInstagramReelTool,
     MediaControlTool,
     MessageWhatsAppTool,
     OpenLinkedInTool,
@@ -79,6 +80,7 @@ from app.services.tools.integrations import (
     PlayYouTubeTool,
     ReadNotesTool,
     SetTimerTool,
+    ShowInstagramReelsTool,
     TakeNoteTool,
 )
 from app.services.tools.vision_tools import CaptureScreenTool, OcrImageTool
@@ -161,6 +163,8 @@ AVAILABLE_TOOLS: list[Tool] = [
     CreateRecurringCalendarEventTool(),
     ConnectCalendarTool(),
     SetTimerTool(),
+    ShowInstagramReelsTool(),
+    DescribeInstagramReelTool(),
     TakeNoteTool(),
     ReadNotesTool(),
 ]

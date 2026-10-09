@@ -126,7 +126,7 @@ export default function App() {
       <ElysiaOrb assistantStatus={status} />
       <button
         onClick={() => setLanguageOpen(true)}
-        className="fixed left-5 top-5 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed left-5 top-5 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "language.select")}
       >
         {locale.toUpperCase()} · I
@@ -134,7 +134,7 @@ export default function App() {
       <LanguagePanel open={languageOpen} onClose={() => setLanguageOpen(false)} />
       <button
         onClick={() => setPreferencesOpen(true)}
-        className="fixed left-5 top-28 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed left-5 top-28 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label="Open local accessibility and appearance preferences"
       >
         Preferences · O
@@ -142,7 +142,7 @@ export default function App() {
       <PreferencesPanel open={preferencesOpen} onClose={() => setPreferencesOpen(false)} />
       <button
         onClick={() => setMemoryOpen(true)}
-        className="fixed right-5 top-5 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed right-5 top-5 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "app.openMemory")}
       >
         {translate(locale, "app.memory")}
@@ -150,7 +150,7 @@ export default function App() {
       <MemoryPanel open={memoryOpen} onClose={() => setMemoryOpen(false)} />
       <button
         onClick={() => setPluginsOpen(true)}
-        className="fixed right-5 top-16 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed right-5 top-16 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "app.openPlugins")}
       >
         {translate(locale, "app.plugins")}
@@ -158,7 +158,7 @@ export default function App() {
       <PluginPanel open={pluginsOpen} onClose={() => setPluginsOpen(false)} />
       <button
         onClick={() => setPlansOpen(true)}
-        className="fixed right-5 top-28 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed right-5 top-28 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "app.openPlans")}
       >
         {translate(locale, "app.plans")}
@@ -166,7 +166,7 @@ export default function App() {
       <PlanPanel open={plansOpen} onClose={() => setPlansOpen(false)} />
       <button
         onClick={() => setAgentsOpen(true)}
-        className="fixed right-5 top-40 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed right-5 top-40 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "app.openAgents")}
       >
         {translate(locale, "app.agents")}
@@ -174,7 +174,7 @@ export default function App() {
       <AgentPanel open={agentsOpen} onClose={() => setAgentsOpen(false)} />
       <button
         onClick={() => setSyncOpen(true)}
-        className="fixed right-5 top-52 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed right-5 top-52 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "app.openSync")}
       >
         {translate(locale, "app.sync")}
@@ -182,7 +182,7 @@ export default function App() {
       <SyncPanel open={syncOpen} onClose={() => setSyncOpen(false)} />
       <button
         onClick={() => setAdminOpen(true)}
-        className="fixed right-5 top-64 z-10 rounded-xl border border-cyan-200/15 bg-slate-950/60 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-100/80 backdrop-blur hover:bg-cyan-300/10"
+        className="fixed right-5 top-64 z-10 rounded-xl border border-cyan-200/45 bg-slate-950/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-cyan-50 backdrop-blur hover:bg-cyan-300/20 hover:border-cyan-200/80"
         aria-label={translate(locale, "app.openAdmin")}
       >
         {translate(locale, "app.admin")}

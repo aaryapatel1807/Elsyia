@@ -30,7 +30,6 @@ from app.services.memory.consolidate import maybe_consolidate
 from app.services.memory.store import get_memory_store
 from app.services.tools.intent import looks_like_command, route_intent, route_with_llm
 from app.services.elsyia.persona import ELSYIA_NAME, build_system_prompt
-from app.services.llm.factory import get_llm_provider
 from app.services.tools.registry import registry
 from app.services.voice.factory import get_stt_provider
 
@@ -166,6 +165,21 @@ def _describe_tool_result(tool_name: str, result: Any) -> str:
         return (result.get("summary", "") or "")[:500]
     if tool_name == "launch_application":
         return f"{result.get('application', 'The app')} is launching."
+    if tool_name == "show_instagram_reels":
+        reels = result.get("reels", [])
+        if not reels:
+            return result.get("note", "Opened your Instagram reels.")
+        first = reels[0]
+        cap = (first.get("caption") or "").strip()
+        who = first.get("username") or "someone"
+        extra = f" — {cap[:120]}" if cap else ""
+        more = f" Plus {len(reels) - 1} more." if len(reels) > 1 else ""
+        return f"Opened the top reel from {who}{extra}.{more}"
+    if tool_name == "describe_instagram_reel":
+        summary = (result.get("summary") or "").strip()
+        if summary:
+            return summary[:500]
+        return result.get("note", "Opened the reel.")
     # Generic fallback: brief key summary, never a raw dict dump.
     message = result.get("message")
     if isinstance(message, str) and message.strip():
@@ -388,10 +402,28 @@ class ElsyiaLoop:
         conversation_id: UUID | None = None,
         confirmed: set[str] | None = None,
     ) -> ElsyiaTurnResult:
-        """Run one voice turn: STT -> handle_text. TTS stays a client call."""
+        """Run one voice turn: STT -> handle_text. TTS stays a client call.
+
+        STT failures return a graceful turn instead of a raw 500 — the
+        voice loop must never die on a transcription error.
+        """
         t0 = time.perf_counter()
         stt = get_stt_provider()
-        transcript = await asyncio.to_thread(stt.transcribe, audio)
+        try:
+            transcript = await asyncio.to_thread(stt.transcribe, audio)
+        except Exception as exc:  # noqa: BLE001 — STT must not kill the turn
+            logger.error("Elsyia STT failed: %s", exc)
+            stt_ms = (time.perf_counter() - t0) * 1000
+            return ElsyiaTurnResult(
+                transcript="",
+                reply=(
+                    "I couldn't make out that audio. "
+                    "Check the microphone and try again."
+                ),
+                conversation_id=str(conversation_id) if conversation_id else "",
+                intent="none",
+                timings_ms={"stt_ms": round(stt_ms, 1)},
+            )
         stt_ms = (time.perf_counter() - t0) * 1000
         result = await self.handle_text(text=transcript, conversation_id=conversation_id, confirmed=confirmed)
         result.transcript = transcript

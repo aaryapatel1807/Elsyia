@@ -76,7 +76,9 @@ export function useVoiceAssistant() {
         throw new Error(`Chat request failed: ${chatResponse.status}`);
       }
 
-      setStatus("speaking");
+      // The model hasn't produced anything yet: "thinking" until the
+      // first token or tool result arrives, then "speaking".
+      setStatus("thinking");
       setReply("");
       setToolResult(null);
 
@@ -85,22 +87,44 @@ export function useVoiceAssistant() {
       let fullReply = "";
       let currentSentence = "";
       let accumulatedChunk = "";
-      
+      let contentSeen = false;
+      let toolSeen = false;
+      let audioEnqueued = false;
+      let streamError: string | null = null;
+
       const audioQueue = new AudioQueue();
       audioQueue.onComplete = () => {
         setStatus("idle");
       };
       audioQueueRef.current = audioQueue;
 
+      const markSpeaking = () => {
+        if (!contentSeen) {
+          contentSeen = true;
+          setStatus("speaking");
+        }
+      };
+      const enqueueAudio = (sentence: string) => {
+        const text = sentence.trim();
+        if (!text) return;
+        markSpeaking();
+        fetchSpeechUrl(text)
+          .then((url) => {
+            audioEnqueued = true;
+            audioQueue.enqueue(url);
+          })
+          .catch((err) => console.error("Failed to fetch audio for chunk:", err));
+      };
+
       if (reader) {
-        while (true) {
+        while (!streamError) {
           const { done, value } = await reader.read();
           if (done) break;
           accumulatedChunk += decoder.decode(value, { stream: true });
-          
+
           let lines = accumulatedChunk.split('\n');
-          accumulatedChunk = lines.pop() || ''; 
-          
+          accumulatedChunk = lines.pop() || '';
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const dataStr = line.slice(6);
@@ -111,41 +135,51 @@ export function useVoiceAssistant() {
                   setToolResult(null);
                   currentSentence += data.content;
                   setReply(fullReply);
-                  
+                  markSpeaking();
+
                   // Sentence boundary detection (now including commas for ultra-fast first response)
                   if (/[.,!?:](\s|\n)/.test(currentSentence) || currentSentence.split(' ').length > 12) {
                     const sentenceToSpeak = currentSentence.trim();
-                    currentSentence = ""; 
-                    if (sentenceToSpeak.length > 0) {
-                      fetchSpeechUrl(sentenceToSpeak).then(url => {
-                        audioQueue.enqueue(url);
-                      }).catch(err => console.error("Failed to fetch audio for chunk:", err));
-                    }
+                    currentSentence = "";
+                    enqueueAudio(sentenceToSpeak);
                   }
                 } else if (data.type === 'tool') {
                   const toolReply = data.content || "";
                   setReply(toolReply);
                   setToolResult(data.tool_result || null);
-                  if (toolReply.trim()) {
-                    fetchSpeechUrl(toolReply).then(url => {
-                      audioQueue.enqueue(url);
-                    }).catch(err => console.error("Failed to fetch tool result audio:", err));
-                  }
+                  toolSeen = true;
+                  enqueueAudio(toolReply);
                 } else if (data.type === 'done') {
                   conversationIdRef.current = data.conversation_id;
-                  if (currentSentence.trim().length > 0) {
-                    fetchSpeechUrl(currentSentence.trim()).then(url => {
-                      audioQueue.enqueue(url);
-                    }).catch(err => console.error("Failed to fetch audio for chunk:", err));
-                  }
+                  enqueueAudio(currentSentence);
+                  currentSentence = "";
                 } else if (data.type === 'error') {
-                  console.error("LLM Error:", data.error);
+                  // Surface the real backend/LLM error instead of
+                  // leaving the orb stuck on "speaking" forever.
+                  streamError =
+                    typeof data.error === "string" && data.error.trim()
+                      ? data.error
+                      : "The assistant ran into an error.";
                 }
               } catch (e) {
                 console.error("Failed to parse SSE data:", dataStr);
               }
             }
           }
+          if (streamError) break;
+        }
+      }
+
+      if (streamError) {
+        audioQueue.stop();
+        setLastError(streamError);
+        setStatus("idle");
+      } else if (!audioEnqueued) {
+        // The stream ended but no audio ever played (TTS failed or the
+        // model stayed silent) — the orb must not stay stuck.
+        setStatus("idle");
+        if (!fullReply.trim() && !toolSeen) {
+          setLastError("The assistant didn't respond — is the model reachable?");
         }
       }
     } catch (err) {
