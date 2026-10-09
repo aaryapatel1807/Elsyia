@@ -16,6 +16,9 @@ The approach is honest about platform limits:
 - Spotify: open.spotify.com deep links + system media keys. The full Web
   API needs per-user OAuth and Spotify Premium for playback control;
   documented as a future step, not faked.
+- Instagram: the linked instagram-cli reads reels and describes them via
+  media-understanding; falls back to instagram.com deep links when the
+  CLI isn't available.
 """
 
 from app.services.tools.integrations.media import (
@@ -30,8 +33,13 @@ from app.services.tools.integrations.productivity import (
     SetTimerTool,
     TakeNoteTool,
 )
+from app.services.tools.integrations.social import (
+    DescribeInstagramReelTool,
+    ShowInstagramReelsTool,
+)
 
 __all__ = [
+    "DescribeInstagramReelTool",
     "MediaControlTool",
     "MessageWhatsAppTool",
     "OpenLinkedInTool",
@@ -39,5 +47,6 @@ __all__ = [
     "PlayYouTubeTool",
     "ReadNotesTool",
     "SetTimerTool",
+    "ShowInstagramReelsTool",
     "TakeNoteTool",
 ]

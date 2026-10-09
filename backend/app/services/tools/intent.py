@@ -60,6 +60,11 @@ _WHATSAPP_RE = re.compile(
 _WHATSAPP_SHORT_RE = re.compile(r"^whatsapp\s+(\+?[\d][\d\s\-]{6,})\s+(.+)$", re.IGNORECASE)
 _LINKEDIN_OPEN_RE = re.compile(r"^open\s+linkedin(?:\s+(jobs|feed))?\s*$", re.IGNORECASE)
 _LINKEDIN_SEARCH_RE = re.compile(r"^search\s+linkedin\s+for\s+(.+)$", re.IGNORECASE)
+_INSTAGRAM_REELS_RE = re.compile(
+    r"^(?:show(?:\s+me)?|open)\s+(?:my\s+|the\s+|latest\s+)?(?:instagram\s+)?reels?"
+    r"(?:\s+(?:about|on|for)\s+(.+))?\s*$",
+    re.IGNORECASE,
+)
 _GMAIL_CHECK_PHRASES = {
     "check my email", "check email", "check my emails", "check my inbox",
     "any new email", "any new emails", "unread emails", "unread email",
@@ -205,6 +210,14 @@ def _route_elsyia_intent(text: str, phrase: str, lowered: str) -> ToolIntent | N
     if match:
         return ToolIntent(
             "open_linkedin", {"target": f"search:{_clean(match.group(1))}"}, 0.97
+        )
+
+    match = _INSTAGRAM_REELS_RE.match(text)
+    if match:
+        return ToolIntent(
+            "show_instagram_reels",
+            {"query": _clean(match.group(1) or "")},
+            0.97,
         )
 
     if phrase in _GMAIL_CHECK_PHRASES:
@@ -522,6 +535,9 @@ _FUZZY_COMMANDS: tuple[tuple[str, str, dict[str, Any]], ...] = (
     ("mute the volume", "set_system_mute", {"muted": True}),
     ("unmute the volume", "set_system_mute", {"muted": False}),
     ("open youtube", "play_youtube", {"query": ""}),
+    ("show me my reels", "show_instagram_reels", {"query": ""}),
+    ("open instagram reels", "show_instagram_reels", {"query": ""}),
+    ("show instagram reels", "show_instagram_reels", {"query": ""}),
     ("connect my gmail", "connect_gmail", {}),
     ("connect my calendar", "connect_calendar", {}),
 )
